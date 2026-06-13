@@ -210,6 +210,10 @@ if (ENABLE_LIBRETRO)
     add_subdirectory(citra_libretro)
 endif()
 
+if (SWITCH)
+    add_subdirectory(tico)
+endif()
+
 if (ENABLE_ROOM)
     add_subdirectory(citra_room)
 endif()

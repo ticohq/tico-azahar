@@ -5,7 +5,7 @@
 #include <fmt/format.h>
 #if defined(_WIN32)
 #include <windows.h>
-#else
+#elif !defined(__SWITCH__)
 #include <dlfcn.h>
 #endif
 #include "dynamic_library.h"
@@ -25,6 +25,8 @@ DynamicLibrary::~DynamicLibrary() {
     if (handle) {
 #if defined(_WIN32)
         FreeLibrary(reinterpret_cast<HMODULE>(handle));
+#elif defined(__SWITCH__)
+        // Dynamic loading is unavailable on Switch.
 #else
         dlclose(handle);
 #endif // defined(_WIN32)
@@ -33,7 +35,11 @@ DynamicLibrary::~DynamicLibrary() {
 }
 
 bool DynamicLibrary::Load(std::string_view filename) {
-#if defined(_WIN32)
+#if defined(__SWITCH__)
+    handle = nullptr;
+    load_error = fmt::format("Dynamic loading not supported on Switch: {}", filename);
+    return false;
+#elif defined(_WIN32)
     handle = reinterpret_cast<void*>(LoadLibraryA(filename.data()));
     if (!handle) {
         DWORD error_message_id = GetLastError();
@@ -60,6 +66,8 @@ bool DynamicLibrary::Load(std::string_view filename) {
 void* DynamicLibrary::GetRawSymbol(std::string_view name) const {
 #if defined(_WIN32)
     return reinterpret_cast<void*>(GetProcAddress(reinterpret_cast<HMODULE>(handle), name.data()));
+#elif defined(__SWITCH__)
+    return nullptr;
 #else
     return dlsym(handle, name.data());
 #endif // defined(_WIN32)

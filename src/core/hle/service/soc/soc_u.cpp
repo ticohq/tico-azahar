@@ -38,7 +38,9 @@
 #include <cerrno>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#if !defined(__SWITCH__)
 #include <ifaddrs.h>
+#endif
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -2334,6 +2336,13 @@ std::optional<SOC_U::InterfaceInfo> SOC_U::GetDefaultInterfaceInfo() {
             break;
         }
     }
+#elif defined(__SWITCH__)
+    ret.address = s_info.sin_addr.s_addr;
+    ret.netmask = inet_addr("255.255.255.0");
+    ret.broadcast = (ret.address & ret.netmask) | ~ret.netmask;
+    interface_found = true;
+
+    LOG_DEBUG(Service_SOC, "Using Switch interface fallback");
 #elif !(defined(ANDROID) && defined(HAVE_LIBRETRO))
     // Libretro Android builds target API 21, but getifaddrs() requires API 24+.
     // Standalone Android (minSdk 29) and other platforms have getifaddrs().

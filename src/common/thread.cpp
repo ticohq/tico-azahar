@@ -12,6 +12,7 @@
 #elif defined(_WIN32)
 #include <windows.h>
 #include "common/string_util.h"
+#elif defined(__SWITCH__)
 #else
 #if defined(__Bitrig__) || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <pthread_np.h>
@@ -20,7 +21,7 @@
 #endif
 #include <sched.h>
 #endif
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__SWITCH__)
 #include <unistd.h>
 #endif
 
@@ -58,7 +59,36 @@ void SetCurrentThreadPriority(ThreadPriority new_priority) {
     SetThreadPriority(handle, windows_priority);
 }
 
+#elif defined(__SWITCH__)
+
+// Switch priorities: 0 = highest, 63 = lowest; user apps default to 44.
+// 0xFFFF8000 is CUR_THREAD_HANDLE (same value as INVALID_HANDLE in libnx).
+extern "C" unsigned svcSetThreadPriority(unsigned handle, unsigned prio);
+extern "C" unsigned svcSetThreadCoreMask(unsigned handle, int preferred_core, unsigned long long affinity_mask);
+
+void SetCurrentThreadPriority(ThreadPriority new_priority) {
+    unsigned prio;
+    switch (new_priority) {
+    case ThreadPriority::Low:      prio = 51; break;
+    case ThreadPriority::Normal:   prio = 44; break;
+    case ThreadPriority::High:     prio = 40; break;
+    case ThreadPriority::VeryHigh: prio = 36; break;
+    case ThreadPriority::Critical: prio = 32; break;
+    default:                       prio = 44; break;
+    }
+    svcSetThreadPriority(0xFFFF8000U, prio);
+}
+
+void SetCurrentThreadAffinityMask(s32 preferred_core, u64 affinity_mask) {
+    svcSetThreadCoreMask(0xFFFF8000U, preferred_core, affinity_mask);
+}
+
 #else
+
+void SetCurrentThreadAffinityMask(s32 preferred_core, u64 affinity_mask) {
+    (void)preferred_core;
+    (void)affinity_mask;
+}
 
 void SetCurrentThreadPriority(ThreadPriority new_priority) {
     pthread_t this_thread = pthread_self();
@@ -106,6 +136,8 @@ void SetCurrentThreadName(const char* name) {
         errno = e;
         LOG_ERROR(Common, "Failed to set thread name to '{}': {}", truncated, GetLastErrorMsg());
     }
+#elif defined(__SWITCH__)
+    (void)name;
 #else
     pthread_setname_np(pthread_self(), name);
 #endif

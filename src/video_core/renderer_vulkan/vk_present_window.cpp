@@ -2,6 +2,7 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include "common/logging/log.h"
 #include "common/microprofile.h"
 #include "common/settings.h"
 #include "common/thread.h"
@@ -19,7 +20,44 @@ MICROPROFILE_DEFINE(Vulkan_WaitPresent, "Vulkan", "Wait For Present", MP_RGB(128
 
 namespace Vulkan {
 
+#ifdef __SWITCH__
 namespace {
+OverlayDrawCallback g_overlay_draw_callback;
+OverlayResetCallback g_overlay_reset_callback;
+} // namespace
+
+void SetOverlayDrawCallback(OverlayDrawCallback callback) {
+    g_overlay_draw_callback = std::move(callback);
+}
+
+void SetOverlayResetCallback(OverlayResetCallback callback) {
+    g_overlay_reset_callback = std::move(callback);
+}
+
+bool HasOverlayDrawCallback() {
+    return static_cast<bool>(g_overlay_draw_callback);
+}
+#endif
+
+namespace {
+
+#ifdef __SWITCH__
+extern "C" u32 svcSetThreadCoreMask(u32 handle, s32 preferred_core, u32 affinity_mask);
+extern "C" u32 svcGetThreadCoreMask(s32* out_preferred_core, u64* out_affinity_mask, u32 handle);
+constexpr u32 CurrentThreadHandle = 0xFFFF8000;
+
+void PinPresentThreadToCore() {
+    constexpr s32 core = 0;
+    constexpr u32 mask = 1u << static_cast<u32>(core);
+    const u32 set_rc = svcSetThreadCoreMask(CurrentThreadHandle, core, mask);
+    s32 preferred = -1;
+    u64 affinity = 0;
+    const u32 get_rc = svcGetThreadCoreMask(&preferred, &affinity, CurrentThreadHandle);
+    LOG_INFO(Render_Vulkan,
+             "Switch thread affinity VulkanPresent: set core={} mask=0x{:x} rc=0x{:x} get_rc=0x{:x} preferred={} affinity=0x{:x}",
+             core, mask, set_rc, get_rc, preferred, affinity);
+}
+#endif
 
 bool CanBlitToSwapchain(const vk::PhysicalDevice& physical_device, vk::Format format) {
     const vk::FormatProperties props{physical_device.getFormatProperties(format)};
@@ -309,6 +347,9 @@ void PresentWindow::WaitPresent() {
 
 void PresentWindow::PresentThread(std::stop_token token) {
     Common::SetCurrentThreadName("VulkanPresent");
+#ifdef __SWITCH__
+    PinPresentThreadToCore();
+#endif
     while (!token.stop_requested()) {
         std::unique_lock lock{queue_mutex};
 
@@ -356,6 +397,14 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
 #endif
         std::scoped_lock submit_lock{scheduler.submit_mutex};
         graphics_queue.waitIdle();
+#ifdef __SWITCH__
+        // The overlay derives image views/framebuffers from the current swapchain
+        // images; drop them before Create() destroys those images. The queue is
+        // already idle here so it is safe to destroy the derived resources.
+        if (g_overlay_reset_callback) {
+            g_overlay_reset_callback();
+        }
+#endif
         swapchain.Create(frame->width, frame->height, surface, low_refresh_rate);
     };
 
@@ -417,11 +466,22 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
             },
         },
     };
+#ifdef __SWITCH__
+    // When the overlay is active, hand it the swapchain image in color-attachment
+    // layout so it can composite ImGui with a load-op=LOAD render pass, then do the
+    // final transition to present ourselves. Otherwise go straight to present.
+    const bool draw_overlay = static_cast<bool>(g_overlay_draw_callback);
+#else
+    constexpr bool draw_overlay = false;
+#endif
+    const vk::ImageLayout post_blit_layout =
+        draw_overlay ? vk::ImageLayout::eColorAttachmentOptimal : vk::ImageLayout::ePresentSrcKHR;
     const vk::ImageMemoryBarrier post_barrier{
         .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-        .dstAccessMask = vk::AccessFlagBits::eMemoryRead,
+        .dstAccessMask = vk::AccessFlagBits::eMemoryRead |
+                         vk::AccessFlagBits::eColorAttachmentWrite,
         .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-        .newLayout = vk::ImageLayout::ePresentSrcKHR,
+        .newLayout = post_blit_layout,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image = swapchain_image,
@@ -452,6 +512,33 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
     cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
                            vk::PipelineStageFlagBits::eAllCommands,
                            vk::DependencyFlagBits::eByRegion, {}, {}, post_barrier);
+
+#ifdef __SWITCH__
+    if (draw_overlay) {
+        g_overlay_draw_callback(cmdbuf, swapchain_image, extent,
+                                swapchain.GetSurfaceFormat().format);
+
+        const vk::ImageMemoryBarrier present_barrier{
+            .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+            .dstAccessMask = vk::AccessFlagBits::eMemoryRead,
+            .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .newLayout = vk::ImageLayout::ePresentSrcKHR,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = swapchain_image,
+            .subresourceRange{
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = VK_REMAINING_ARRAY_LAYERS,
+            },
+        };
+        cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                               vk::PipelineStageFlagBits::eBottomOfPipe,
+                               vk::DependencyFlagBits::eByRegion, {}, {}, present_barrier);
+    }
+#endif
 
     cmdbuf.end();
 

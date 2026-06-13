@@ -3,6 +3,7 @@
 // Refer to the license.txt file included.
 
 #include <cstring>
+#include <thread>
 #include <dynarmic/interface/A32/a32.h>
 #include <dynarmic/interface/optimization_flags.h>
 #include "common/assert.h"
@@ -94,6 +95,10 @@ public:
         case Dynarmic::A32::Exception::WaitForInterrupt:
         case Dynarmic::A32::Exception::WaitForEvent:
         case Dynarmic::A32::Exception::Yield:
+#ifdef __SWITCH__
+            parent.jit->HaltExecution();
+#endif
+            return;
         case Dynarmic::A32::Exception::PreloadData:
         case Dynarmic::A32::Exception::PreloadDataWithIntentToWrite:
         case Dynarmic::A32::Exception::PreloadInstruction:
@@ -309,6 +314,14 @@ std::unique_ptr<Dynarmic::A32::Jit> ARM_Dynarmic::MakeJit() {
     }
     config.coprocessors[15] = std::make_shared<DynarmicCP15>(cp15_state);
     config.define_unpredictable_behaviour = true;
+
+#ifdef __SWITCH__
+    config.hook_hint_instructions = true;
+    config.code_cache_size = 16 * 1024 * 1024;
+    LOG_INFO(Core_ARM11,
+             "Switch Dynarmic config: core={} optimizations=0x{:x} code_cache={}",
+             GetID(), static_cast<unsigned>(config.optimizations), config.code_cache_size);
+#endif
 
     // Multi-process state
     config.processor_id = GetID();

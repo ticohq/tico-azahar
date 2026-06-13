@@ -30,6 +30,7 @@ if (BSD STREQUAL "OpenBSD")
 endif()
 
 option(ENABLE_LIBRETRO "Build as a LibRetro core" OFF)
+option(SWITCH "Build the standalone Nintendo Switch frontend" OFF)
 
 # Some submodules like to pick their own default build type if not specified.
 # Make sure we default to Release build type always, unless the generator has custom types.
@@ -173,6 +174,23 @@ if(ENABLE_LIBRETRO)
     foreach(_opt IN LISTS _LIBRETRO_INCOMPATIBLE_OPTIONS)
         set(${_opt} OFF CACHE BOOL "Disabled for libretro" FORCE)
     endforeach()
+endif()
+
+if(SWITCH)
+    set(ENABLE_QT OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_SDL2 OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_LIBRETRO OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_OPENGL OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_SOFTWARE_RENDERER OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_VULKAN ON CACHE BOOL "Enabled for Nintendo Switch" FORCE)
+    set(ENABLE_TESTS OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_WEB_SERVICE OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_SCRIPTING OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_CUBEB OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_OPENAL OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_LIBUSB OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_ROOM OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
+    set(ENABLE_ROOM_STANDALONE OFF CACHE BOOL "Disabled for Nintendo Switch" FORCE)
 endif()
 
 # Pass the following values to C++ land

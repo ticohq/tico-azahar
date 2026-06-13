@@ -3,7 +3,9 @@
 // Refer to the license.txt file included.
 
 // Include the vulkan platform specific header
-#if defined(ANDROID)
+#if defined(__SWITCH__)
+#define VK_USE_PLATFORM_VI_NN
+#elif defined(ANDROID)
 #define VK_USE_PLATFORM_ANDROID_KHR
 #elif defined(WIN32)
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -14,6 +16,7 @@
 #define VK_USE_PLATFORM_XLIB_KHR
 #endif
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 #include <boost/container/static_vector.hpp>
@@ -24,6 +27,13 @@
 #include "common/settings.h"
 #include "core/frontend/emu_window.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
+
+#if defined(__SWITCH__)
+extern "C" {
+PFN_vkVoidFunction VKAPI_CALL vk_icdGetInstanceProcAddr(VkInstance instance, const char* pName);
+VkResult VKAPI_CALL vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t* pSupportedVersion);
+}
+#endif
 
 namespace Vulkan {
 
@@ -105,7 +115,10 @@ std::shared_ptr<Common::DynamicLibrary> OpenLibrary(
     }
 #endif
     auto library = std::make_shared<Common::DynamicLibrary>();
-#ifdef __APPLE__
+#if defined(__SWITCH__)
+    // NVK is statically linked on Switch, so there is no libvulkan shared object to dlopen.
+    return library;
+#elif defined(__APPLE__)
     const std::string filename = Common::DynamicLibrary::GetLibraryName("vulkan");
     if (!library->Load(filename)) {
         // Fall back to directly loading bundled MoltenVK library.
@@ -195,6 +208,24 @@ vk::SurfaceKHR CreateSurface(vk::Instance instance, const Frontend::EmuWindow& e
             UNREACHABLE();
         }
     }
+#elif defined(VK_USE_PLATFORM_VI_NN)
+    if (window_info.type == Frontend::WindowSystemType::Switch) {
+        if (!window_info.render_surface) {
+            LOG_CRITICAL(Render_Vulkan, "Switch Vulkan surface requested with null NWindow");
+            UNREACHABLE();
+        }
+
+        const vk::ViSurfaceCreateInfoNN vi_ci = {
+            .window = window_info.render_surface,
+        };
+
+        if ((res = instance.createViSurfaceNN(&vi_ci, nullptr, &surface)) !=
+            vk::Result::eSuccess) {
+            LOG_CRITICAL(Render_Vulkan, "Failed to initialize Switch VI surface: {}",
+                         vk::to_string(res));
+            UNREACHABLE();
+        }
+    }
 #endif
 
     if (!surface) {
@@ -245,6 +276,10 @@ std::vector<const char*> GetInstanceExtensions(Frontend::WindowSystemType window
     case Frontend::WindowSystemType::Android:
         extensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
         break;
+#elif defined(VK_USE_PLATFORM_VI_NN)
+    case Frontend::WindowSystemType::Switch:
+        extensions.push_back(VK_NN_VI_SURFACE_EXTENSION_NAME);
+        break;
 #endif
     default:
         LOG_ERROR(Render_Vulkan, "Presentation not supported on this platform");
@@ -288,12 +323,25 @@ vk::InstanceCreateFlags GetInstanceFlags() {
 vk::UniqueInstance CreateInstance(const Common::DynamicLibrary& library,
                                   Frontend::WindowSystemType window_type, bool enable_validation,
                                   bool dump_command_buffers) {
+#if defined(__SWITCH__)
+    (void)library;
+    uint32_t icd_version = 7;
+    vk_icdNegotiateLoaderICDInterfaceVersion(&icd_version);
+
+    auto vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+        vk_icdGetInstanceProcAddr(VK_NULL_HANDLE, "vkGetInstanceProcAddr"));
+    if (!vkGetInstanceProcAddr) {
+        vkGetInstanceProcAddr =
+            reinterpret_cast<PFN_vkGetInstanceProcAddr>(&vk_icdGetInstanceProcAddr);
+    }
+#else
     if (!library.IsLoaded()) {
         throw std::runtime_error("Failed to load Vulkan driver library");
     }
 
     const auto vkGetInstanceProcAddr =
         library.GetSymbol<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+#endif
     if (!vkGetInstanceProcAddr) {
         throw std::runtime_error("Failed GetSymbol vkGetInstanceProcAddr");
     }

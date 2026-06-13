@@ -20,6 +20,9 @@
 #ifdef HAVE_OPENAL
 #include "audio_core/openal_sink.h"
 #endif
+#ifdef __SWITCH__
+#include "audio_core/libnx_sink.h"
+#endif
 #include "common/logging/log.h"
 
 namespace AudioCore {
@@ -53,6 +56,13 @@ constexpr std::array sink_details = {
                     return std::make_unique<SDL2Sink>(std::string(device_id));
                 },
                 &ListSDL2SinkDevices},
+#endif
+#ifdef __SWITCH__
+    SinkDetails{SinkType::Libnx, "Switch Audio",
+                [](std::string_view device_id) -> std::unique_ptr<Sink> {
+                    return std::make_unique<LibnxSink>(device_id);
+                },
+                &ListLibnxSinkDevices},
 #endif
     SinkDetails{SinkType::Null, "None",
                 [](std::string_view device_id) -> std::unique_ptr<Sink> {

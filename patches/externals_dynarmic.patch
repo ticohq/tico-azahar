@@ -1,0 +1,139 @@
+diff --git a/src/dynarmic/backend/arm64/address_space.cpp b/src/dynarmic/backend/arm64/address_space.cpp
+index 2c7ae777..84df25cc 100644
+--- a/src/dynarmic/backend/arm64/address_space.cpp
++++ b/src/dynarmic/backend/arm64/address_space.cpp
+@@ -23,7 +23,7 @@ namespace Dynarmic::Backend::Arm64 {
+ AddressSpace::AddressSpace(size_t code_cache_size)
+         : code_cache_size(code_cache_size)
+         , mem(code_cache_size)
+-        , code(mem.ptr(), mem.ptr())
++        , code(mem.wptr(), mem.xptr())
+         , fastmem_manager(exception_handler) {
+     ASSERT_MSG(code_cache_size <= 128 * 1024 * 1024, "code_cache_size > 128 MiB not currently supported");
+ 
+@@ -98,7 +98,7 @@ void AddressSpace::ClearCache() {
+ }
+ 
+ void AddressSpace::DumpDisassembly() const {
+-    for (u32* ptr = mem.ptr(); ptr < code.xptr<u32*>(); ptr++) {
++    for (u32* ptr = mem.xptr(); ptr < code.xptr<u32*>(); ptr++) {
+         std::printf("%s", Common::DisassembleAArch64(*ptr, mcl::bit_cast<u64>(ptr)).c_str());
+     }
+ }
+@@ -136,7 +136,7 @@ void AddressSpace::Link(EmittedBlockInfo& block_info) {
+     using namespace oaknut::util;
+ 
+     for (auto [ptr_offset, target] : block_info.relocations) {
+-        CodeGenerator c{mem.ptr(), mem.ptr()};
++        CodeGenerator c{mem.wptr(), mem.xptr()};
+         c.set_xptr(reinterpret_cast<u32*>(block_info.entry_point + ptr_offset));
+ 
+         switch (target) {
+@@ -276,7 +276,7 @@ void AddressSpace::LinkBlockLinks(const CodePtr entry_point, const CodePtr targe
+     using namespace oaknut::util;
+ 
+     for (auto [ptr_offset, type] : block_relocations_list) {
+-        CodeGenerator c{mem.ptr(), mem.ptr()};
++        CodeGenerator c{mem.wptr(), mem.xptr()};
+         c.set_xptr(reinterpret_cast<u32*>(entry_point + ptr_offset));
+ 
+         switch (type) {
+diff --git a/src/dynarmic/backend/arm64/address_space.h b/src/dynarmic/backend/arm64/address_space.h
+index 835566bd..644cacbe 100644
+--- a/src/dynarmic/backend/arm64/address_space.h
++++ b/src/dynarmic/backend/arm64/address_space.h
+@@ -50,13 +50,13 @@ protected:
+     virtual void RegisterNewBasicBlock(const IR::Block& block, const EmittedBlockInfo& block_info) = 0;
+ 
+     void ProtectCodeMemory() {
+-#if defined(DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT) || defined(__APPLE__) || defined(__OpenBSD__)
++#if defined(DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__SWITCH__)
+         mem.protect();
+ #endif
+     }
+ 
+     void UnprotectCodeMemory() {
+-#if defined(DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT) || defined(__APPLE__) || defined(__OpenBSD__)
++#if defined(DYNARMIC_ENABLE_NO_EXECUTE_SUPPORT) || defined(__APPLE__) || defined(__OpenBSD__) || defined(__SWITCH__)
+         mem.unprotect();
+ #endif
+     }
+diff --git a/src/dynarmic/backend/exception_handler_macos.cpp b/src/dynarmic/backend/exception_handler_macos.cpp
+index bac8d9c9..79848208 100644
+--- a/src/dynarmic/backend/exception_handler_macos.cpp
++++ b/src/dynarmic/backend/exception_handler_macos.cpp
+@@ -274,7 +274,7 @@ void ExceptionHandler::Register(X64::BlockOfCode& code) {
+ }
+ #elif defined(MCL_ARCHITECTURE_ARM64)
+ void ExceptionHandler::Register(oaknut::CodeBlock& mem, std::size_t size) {
+-    const u64 code_begin = mcl::bit_cast<u64>(mem.ptr());
++    const u64 code_begin = mcl::bit_cast<u64>(mem.xptr());
+     const u64 code_end = code_begin + size;
+     impl = std::make_unique<Impl>(code_begin, code_end);
+ }
+diff --git a/src/dynarmic/backend/exception_handler_posix.cpp b/src/dynarmic/backend/exception_handler_posix.cpp
+index 2d6d6ea6..3e5081e1 100644
+--- a/src/dynarmic/backend/exception_handler_posix.cpp
++++ b/src/dynarmic/backend/exception_handler_posix.cpp
+@@ -308,7 +308,7 @@ void ExceptionHandler::Register(X64::BlockOfCode& code) {
+ }
+ #elif defined(MCL_ARCHITECTURE_ARM64)
+ void ExceptionHandler::Register(oaknut::CodeBlock& mem, std::size_t size) {
+-    const u64 code_begin = mcl::bit_cast<u64>(mem.ptr());
++    const u64 code_begin = mcl::bit_cast<u64>(mem.xptr());
+     const u64 code_end = code_begin + size;
+     impl = std::make_unique<Impl>(code_begin, code_end);
+ }
+diff --git a/src/dynarmic/common/spin_lock_arm64.cpp b/src/dynarmic/common/spin_lock_arm64.cpp
+index ccf807e2..223e8661 100644
+--- a/src/dynarmic/common/spin_lock_arm64.cpp
++++ b/src/dynarmic/common/spin_lock_arm64.cpp
+@@ -35,6 +35,32 @@ void EmitSpinLockUnlock(oaknut::CodeGenerator& code, oaknut::XReg ptr) {
+     code.STLR(WZR, ptr);
+ }
+ 
++#ifdef __SWITCH__
++
++// Do not use a runtime-generated (JIT) spinlock on the Switch. The JIT'd version
++// lives in a global oaknut::CodeBlock whose svcControlCodeMemory mappings are still
++// present when the process hands control back to nx-hbloader; the leaked locked heap
++// page makes hbl's reload of hbmenu fail with 0xD401 (InvalidCurrentMemory) and abort.
++// Plain acquire/release atomics compile to the same LDAXR/STXR/STLR sequences that
++// EmitSpinLockLock/EmitSpinLockUnlock generate, with no code memory to leak.
++
++void SpinLock::Lock() {
++    for (;;) {
++        int expected = 0;
++        if (__atomic_compare_exchange_n(&storage, &expected, 1, false, __ATOMIC_ACQUIRE,
++                                        __ATOMIC_RELAXED)) {
++            return;
++        }
++        __asm__ volatile("yield" ::: "memory");
++    }
++}
++
++void SpinLock::Unlock() {
++    __atomic_store_n(&storage, 0, __ATOMIC_RELEASE);
++}
++
++#else
++
+ namespace {
+ 
+ struct SpinLockImpl {
+@@ -54,7 +80,7 @@ SpinLockImpl impl;
+ 
+ SpinLockImpl::SpinLockImpl()
+         : mem{4096}
+-        , code{mem.ptr(), mem.ptr()} {}
++        , code{mem.wptr(), mem.xptr()} {}
+ 
+ void SpinLockImpl::Initialize() {
+     mem.unprotect();
+@@ -83,4 +109,6 @@ void SpinLock::Unlock() {
+     impl.unlock(&storage);
+ }
+ 
++#endif  // __SWITCH__
++
+ }  // namespace Dynarmic

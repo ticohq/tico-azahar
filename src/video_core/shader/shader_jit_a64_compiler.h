@@ -40,12 +40,23 @@ public:
 
     void Run(const ShaderSetup& setup, ShaderUnit& state, u32 offset) const {
         program(&setup.uniforms, &state,
-                reinterpret_cast<const std::byte*>(code_mem->ptr()) +
-                    instruction_labels[offset].offset());
+                rx_base + instruction_labels[offset].offset());
     }
 
     void Compile(const std::array<u32, MAX_PROGRAM_CODE_LENGTH>* program_code,
                  const std::array<u32, MAX_SWIZZLE_DATA_LENGTH>* swizzle_data);
+
+    // Called by JitEngine after copying compiled code into the shared pool.
+    void FinalizePool(const std::byte* pool_rx_base) {
+        rx_base = pool_rx_base;
+        program = reinterpret_cast<CompiledShader*>(
+            const_cast<std::byte*>(rx_base) + m_program_offset);
+        code_vec.clear();
+        code_vec.shrink_to_fit();
+    }
+
+    std::size_t GetCompiledSize() const { return code_vec.size() * sizeof(u32); }
+    const std::vector<u32>& GetCompiledCode() const { return code_vec; }
 
     void Compile_ADD(Instruction instr);
     void Compile_DP3(Instruction instr);
@@ -79,7 +90,9 @@ public:
 
 private:
     std::vector<u32> code_vec;
-    std::unique_ptr<oaknut::CodeBlock> code_mem;
+    // rx_base and m_program_offset are set by JitEngine via FinalizePool().
+    const std::byte* rx_base = nullptr;
+    std::size_t m_program_offset = 0;
 
     void Compile_Block(u32 end);
     void Compile_NextInstr();

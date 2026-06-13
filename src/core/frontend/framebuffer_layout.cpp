@@ -54,6 +54,30 @@ static Common::Rectangle<T> MaxRectangle(Common::Rectangle<T> bounding_window,
                                  static_cast<T>(inner_window.GetHeight() * scale));
 }
 
+static void StretchScreenRectangle(Common::Rectangle<u32>& screen, bool stretch, bool vertical,
+                                   u32 width, u32 height, u16 left_right_padding,
+                                   u16 top_bottom_padding) {
+    if (!stretch) {
+        return;
+    }
+
+    const u32 bounds_left = vertical ? 0 : screen.left;
+    const u32 bounds_right = vertical ? width : screen.right;
+    const u32 bounds_top = vertical ? screen.top : 0;
+    const u32 bounds_bottom = vertical ? screen.bottom : height;
+    const u32 bounds_width = bounds_right - bounds_left;
+    const u32 bounds_height = bounds_bottom - bounds_top;
+    const u32 horizontal_padding =
+        std::min(static_cast<u32>(left_right_padding), bounds_width / 2);
+    const u32 vertical_padding =
+        std::min(static_cast<u32>(top_bottom_padding), bounds_height / 2);
+
+    screen = Common::Rectangle<u32>{bounds_left + horizontal_padding,
+                                    bounds_top + vertical_padding,
+                                    bounds_right - horizontal_padding,
+                                    bounds_bottom - vertical_padding};
+}
+
 FramebufferLayout DefaultFrameLayout(u32 width, u32 height, bool swapped, bool upright) {
     return LargeFrameLayout(width, height, swapped, upright, 1.0f,
                             Settings::SmallScreenPosition::BelowLarge);
@@ -261,6 +285,14 @@ FramebufferLayout LargeFrameLayout(u32 width, u32 height, bool swapped, bool upr
     }
     res.top_screen = swapped ? small_screen : large_screen;
     res.bottom_screen = swapped ? large_screen : small_screen;
+    StretchScreenRectangle(res.top_screen, Settings::values.screen_top_stretch.GetValue(),
+                           vertical, width, height,
+                           Settings::values.screen_top_leftright_padding.GetValue(),
+                           Settings::values.screen_top_topbottom_padding.GetValue());
+    StretchScreenRectangle(res.bottom_screen, Settings::values.screen_bottom_stretch.GetValue(),
+                           vertical, width, height,
+                           Settings::values.screen_bottom_leftright_padding.GetValue(),
+                           Settings::values.screen_bottom_topbottom_padding.GetValue());
     if (upright) {
         return reverseLayout(res);
     } else {
@@ -284,9 +316,14 @@ FramebufferLayout HybridScreenLayout(u32 width, u32 height, bool swapped, bool u
     FramebufferLayout res = LargeFrameLayout(width, height, swapped, upright, scale_factor, pos);
     const Common::Rectangle<u32> main = swapped ? res.bottom_screen : res.top_screen;
     const Common::Rectangle<u32> small = swapped ? res.top_screen : res.bottom_screen;
-    res.additional_screen = Common::Rectangle<u32>{small.left, swapped ? small.bottom : main.top,
-                                                   small.right, swapped ? main.bottom : small.top};
-    res.additional_screen_enabled = true;
+    const bool stretched = Settings::values.screen_top_stretch.GetValue() ||
+                           Settings::values.screen_bottom_stretch.GetValue();
+    if (!stretched) {
+        res.additional_screen =
+            Common::Rectangle<u32>{small.left, swapped ? small.bottom : main.top, small.right,
+                                   swapped ? main.bottom : small.top};
+        res.additional_screen_enabled = true;
+    }
     if (upright) {
         return reverseLayout(res);
     } else {

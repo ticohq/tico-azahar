@@ -1,0 +1,52 @@
+diff --git a/config_os.h b/config_os.h
+index ed8e52c6..6a4ee3cb 100644
+--- a/config_os.h
++++ b/config_os.h
+@@ -43,6 +43,11 @@
+ #define CRYPTOPP_UNIX_AVAILABLE
+ #endif
+ 
++// Nintendo Switch/libnx provides an OS-seeded ChaCha RNG via randomGet().
++#if defined(__SWITCH__)
++#define OS_RNG_AVAILABLE
++#endif
++
+ // BSD platforms
+ #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+ #define CRYPTOPP_BSD_AVAILABLE
+diff --git a/osrng.cpp b/osrng.cpp
+index 220fdfcf..e1bfe1c7 100644
+--- a/osrng.cpp
++++ b/osrng.cpp
+@@ -21,6 +21,11 @@
+ #include "osrng.h"
+ #include "rng.h"
+ 
++#if defined(__SWITCH__)
++#include <stddef.h>
++extern "C" void randomGet(void* buf, size_t len);
++#endif
++
+ // FreeBSD links /dev/urandom -> /dev/random. It showed up when we added
+ // O_NOFOLLOW to harden the non-blocking generator. Use Arc4Random instead
+ // for a non-blocking generator. Arc4Random is cryptographic quality prng
+@@ -302,6 +307,11 @@ void BlockingRng::GenerateBlock(byte *output, size_t size)
+ 
+ void OS_GenerateRandomBlock(bool blocking, byte *output, size_t size)
+ {
++#if defined(__SWITCH__)
++	(void)blocking;
++	randomGet(output, size);
++	return;
++#else
+ #ifdef NONBLOCKING_RNG_AVAILABLE
+ 	if (blocking)
+ #endif
+@@ -321,6 +331,7 @@ void OS_GenerateRandomBlock(bool blocking, byte *output, size_t size)
+ 		rng.GenerateBlock(output, size);
+ #endif
+ 	}
++#endif
+ }
+ 
+ void AutoSeededRandomPool::Reseed(bool blocking, unsigned int seedSize)

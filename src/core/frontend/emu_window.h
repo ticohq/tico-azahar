@@ -28,6 +28,9 @@ enum class WindowSystemType : u8 {
     X11,
     Wayland,
     LibRetro,
+#ifdef __SWITCH__
+    Switch,
+#endif
 };
 
 struct Frame;

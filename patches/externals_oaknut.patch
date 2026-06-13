@@ -1,0 +1,191 @@
+diff --git a/include/oaknut/code_block.hpp b/include/oaknut/code_block.hpp
+index bfa87d9..1697512 100644
+--- a/include/oaknut/code_block.hpp
++++ b/include/oaknut/code_block.hpp
+@@ -17,6 +17,26 @@
+ #    include <pthread.h>
+ #    include <sys/mman.h>
+ #    include <unistd.h>
++#elif defined(__SWITCH__)
++// libnx exports common names like Result, Service, and u128 in the global namespace.
++// Hide them while including libnx JIT declarations so oaknut does not leak those names downstream.
++#    define Result libnx_Result
++#    define Service libnx_Service
++#    define u128 libnx_u128
++#    define s128 libnx_s128
++#    define vu128 libnx_vu128
++#    define vs128 libnx_vs128
++extern "C" {
++#    include <switch/kernel/jit.h>
++}
++#    undef BIT
++#    undef BITL
++#    undef Result
++#    undef Service
++#    undef u128
++#    undef s128
++#    undef vu128
++#    undef vs128
+ #else
+ #    include <sys/mman.h>
+ #endif
+@@ -40,12 +60,31 @@ public:
+         m_memory = (std::uint32_t*)mmap(nullptr, size, PROT_MPROTECT(PROT_READ | PROT_WRITE | PROT_EXEC), MAP_ANON | MAP_PRIVATE, -1, 0);
+ #elif defined(__OpenBSD__)
+         m_memory = (std::uint32_t*)mmap(nullptr, size, PROT_READ | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
++#elif defined(__SWITCH__)
++        m_size = (size + 0xfff) & ~std::size_t{0xfff};
++        const auto rc = jitCreate(&m_jit, m_size);
++        if (rc != 0)
++            throw std::bad_alloc{};
++        if (jitTransitionToWritable(&m_jit) != 0) {
++            jitClose(&m_jit);
++            throw std::bad_alloc{};
++        }
++        m_memory = (std::uint32_t*)jitGetRwAddr(&m_jit);
++        m_executable_memory = (std::uint32_t*)jitGetRxAddr(&m_jit);
++        if (m_memory == nullptr || m_executable_memory == nullptr) {
++            jitClose(&m_jit);
++            throw std::bad_alloc{};
++        }
+ #else
+         m_memory = (std::uint32_t*)mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+ #endif
+ 
+         if (m_memory == nullptr)
+             throw std::bad_alloc{};
++#if !defined(_WIN32) && !defined(__SWITCH__)
++        if (m_memory == (std::uint32_t*)MAP_FAILED)
++            throw std::bad_alloc{};
++#endif
+     }
+ 
+     ~CodeBlock()
+@@ -55,6 +94,8 @@ public:
+ 
+ #if defined(_WIN32)
+         VirtualFree((void*)m_memory, 0, MEM_RELEASE);
++#elif defined(__SWITCH__)
++        jitClose(&m_jit);
+ #else
+         munmap(m_memory, m_size);
+ #endif
+@@ -66,16 +107,40 @@ public:
+     CodeBlock& operator=(CodeBlock&&) = delete;
+ 
+     std::uint32_t* ptr() const
++    {
++        return wptr();
++    }
++
++    std::uint32_t* wptr() const
+     {
+         return m_memory;
+     }
+ 
++    std::uint32_t* xptr() const
++    {
++#if defined(__SWITCH__)
++        return m_executable_memory;
++#else
++        return m_memory;
++#endif
++    }
++
+     void protect()
+     {
+ #if defined(__APPLE__) && !TARGET_OS_IPHONE
+         pthread_jit_write_protect_np(1);
+ #elif defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
+         mprotect(m_memory, m_size, PROT_READ | PROT_EXEC);
++#elif defined(__SWITCH__)
++        if (!m_executable) {
++            if (m_jit.type == JitType_CodeMemory) {
++                // Both RW and RX mappings are always active; no SVC needed.
++                // Cache coherency is handled by invalidate(). Just update the flag.
++                m_executable = true;
++            } else if (jitTransitionToExecutable(&m_jit) == 0) {
++                m_executable = true;
++            }
++        }
+ #endif
+     }
+ 
+@@ -85,6 +150,15 @@ public:
+         pthread_jit_write_protect_np(0);
+ #elif defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
+         mprotect(m_memory, m_size, PROT_READ | PROT_WRITE);
++#elif defined(__SWITCH__)
++        if (m_executable) {
++            if (m_jit.type == JitType_CodeMemory) {
++                // Both RW and RX mappings are always active; no SVC needed.
++                m_executable = false;
++            } else if (jitTransitionToWritable(&m_jit) == 0) {
++                m_executable = false;
++            }
++        }
+ #endif
+     }
+ 
+@@ -94,6 +168,39 @@ public:
+         sys_icache_invalidate(mem, size);
+ #elif defined(_WIN32)
+         FlushInstructionCache(GetCurrentProcess(), mem, size);
++#elif defined(__SWITCH__)
++        if (m_jit.type == JitType_CodeMemory) {
++            // JitType_CodeMemory: both RW (m_memory) and RX (m_executable_memory) are
++            // always mapped. mem is an xptr (RX) address; compute the wptr equivalent
++            // for DC CVAU (must use the VA the store was done through).
++            const std::uintptr_t offset =
++                reinterpret_cast<std::uintptr_t>(mem)
++                - reinterpret_cast<std::uintptr_t>(m_executable_memory);
++            const std::uintptr_t wptr = reinterpret_cast<std::uintptr_t>(m_memory) + offset;
++
++            static std::size_t icache_line_size = 0x10000, dcache_line_size = 0x10000;
++            std::uint64_t ctr;
++            __asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
++            const std::size_t isize = icache_line_size =
++                std::min<std::size_t>(icache_line_size, 4 << ((ctr >> 0) & 0xf));
++            const std::size_t dsize = dcache_line_size =
++                std::min<std::size_t>(dcache_line_size, 4 << ((ctr >> 16) & 0xf));
++
++            const std::uintptr_t dend = wptr + size;
++            for (std::uintptr_t addr = wptr & ~(dsize - 1); addr < dend; addr += dsize)
++                __asm__ volatile("dc cvau, %0" :: "r"(addr) : "memory");
++            __asm__ volatile("dsb ish" ::: "memory");
++
++            const std::uintptr_t iend = reinterpret_cast<std::uintptr_t>(mem) + size;
++            for (std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(mem) & ~(isize - 1);
++                 addr < iend; addr += isize)
++                __asm__ volatile("ic ivau, %0" :: "r"(addr) : "memory");
++            __asm__ volatile("dsb ish\nisb" ::: "memory");
++        } else {
++            // JitType_SetProcessMemoryPermission: rx_addr is only mapped when executable.
++            // Calling protect() remaps the region as RX before execution.
++            protect();
++        }
+ #else
+         static std::size_t icache_line_size = 0x10000, dcache_line_size = 0x10000;
+ 
+@@ -132,11 +239,21 @@ public:
+ 
+     void invalidate_all()
+     {
++#if defined(__SWITCH__)
++        // invalidate() expects xptr (executable address) on Switch.
++        invalidate(m_executable_memory != nullptr ? m_executable_memory : m_memory, m_size);
++#else
+         invalidate(m_memory, m_size);
++#endif
+     }
+ 
+ protected:
+     std::uint32_t* m_memory;
++#if defined(__SWITCH__)
++    std::uint32_t* m_executable_memory = nullptr;
++    Jit m_jit{};
++    bool m_executable = false;
++#endif
+     std::size_t m_size = 0;
+ };
+ 

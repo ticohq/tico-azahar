@@ -2,8 +2,11 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#pragma once
+
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <mutex>
 #include <queue>
 #include "common/polyfill_thread.h"
@@ -16,6 +19,25 @@ class EmuWindow;
 }
 
 namespace Vulkan {
+
+#ifdef __SWITCH__
+// Hook used by the tico overlay to composite ImGui over the final swapchain image.
+// Registered from the Switch frontend; called on the present thread after the
+// emulator frame has been blitted into the swapchain image, with the image already
+// transitioned to eColorAttachmentOptimal. The callee records its own load-op=LOAD
+// render pass into `cmd` and must leave the image in eColorAttachmentOptimal.
+using OverlayDrawCallback =
+    std::function<void(vk::CommandBuffer cmd, vk::Image image, vk::Extent2D extent,
+                       vk::Format format)>;
+
+// Called just before the swapchain's images are destroyed (on recreate/shutdown) so
+// the overlay can drop the image views and framebuffers it derived from them.
+using OverlayResetCallback = std::function<void()>;
+
+void SetOverlayDrawCallback(OverlayDrawCallback callback);
+void SetOverlayResetCallback(OverlayResetCallback callback);
+bool HasOverlayDrawCallback();
+#endif
 
 class Instance;
 class Swapchain;

@@ -172,7 +172,7 @@ using socket_t = SOCKET;
 #else // not _WIN32
 
 #include <arpa/inet.h>
-#if !defined(_AIX) && !defined(__MVS__)
+#if !defined(_AIX) && !defined(__MVS__) && !defined(__SWITCH__)
 #include <ifaddrs.h>
 #endif
 #ifdef __MVS__
@@ -193,10 +193,14 @@ using socket_t = SOCKET;
 #endif
 #include <csignal>
 #include <pthread.h>
+#if !defined(__SWITCH__)
 #include <sys/mman.h>
+#endif
 #include <sys/select.h>
 #include <sys/socket.h>
+#if !defined(__SWITCH__)
 #include <sys/un.h>
+#endif
 #include <unistd.h>
 
 using socket_t = int;
@@ -233,6 +237,7 @@ using socket_t = int;
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 #ifdef _WIN32
@@ -2174,6 +2179,8 @@ private:
 #if defined(_WIN32)
   HANDLE hFile_;
   HANDLE hMapping_;
+#elif defined(__SWITCH__)
+  std::vector<char> data_;
 #else
   int fd_;
 #endif
@@ -2564,6 +2571,8 @@ inline void stream_line_reader::append(char c) {
 inline mmap::mmap(const char *path)
 #if defined(_WIN32)
     : hFile_(NULL), hMapping_(NULL)
+#elif defined(__SWITCH__)
+    : data_()
 #else
     : fd_(-1)
 #endif
@@ -2593,6 +2602,21 @@ inline bool mmap::open(const char *path) {
   }
 
   addr_ = ::MapViewOfFile(hMapping_, FILE_MAP_READ, 0, 0, 0);
+#elif defined(__SWITCH__)
+  std::ifstream fs(path, std::ios::binary | std::ios::ate);
+  if (!fs) { return false; }
+
+  const auto end = fs.tellg();
+  if (end < 0) { return false; }
+
+  size_ = static_cast<size_t>(end);
+  data_.resize(size_ == 0 ? 1 : size_);
+  fs.seekg(0, std::ios::beg);
+  if (size_ > 0 && !fs.read(data_.data(), static_cast<std::streamsize>(size_))) {
+    close();
+    return false;
+  }
+  addr_ = data_.data();
 #else
   fd_ = ::open(path, O_RDONLY);
   if (fd_ == -1) { return false; }
@@ -2637,6 +2661,10 @@ inline void mmap::close() {
     ::CloseHandle(hFile_);
     hFile_ = INVALID_HANDLE_VALUE;
   }
+#elif defined(__SWITCH__)
+  data_.clear();
+  data_.shrink_to_fit();
+  addr_ = nullptr;
 #else
   if (addr_ != nullptr) {
     munmap(addr_, size_);
@@ -2968,7 +2996,7 @@ socket_t create_socket(const std::string &host, const std::string &ip, int port,
     hints.ai_flags = socket_flags;
   }
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__SWITCH__)
   if (hints.ai_family == AF_UNIX) {
     const auto addrlen = host.length();
     if (addrlen > sizeof(sockaddr_un::sun_path)) return INVALID_SOCKET;
@@ -3119,7 +3147,8 @@ inline bool bind_ip_address(socket_t sock, const std::string &host) {
   return ret;
 }
 
-#if !defined _WIN32 && !defined ANDROID && !defined _AIX && !defined __MVS__
+#if !defined _WIN32 && !defined ANDROID && !defined _AIX && !defined __MVS__ && \
+    !defined(__SWITCH__)
 #define USE_IF2IP
 #endif
 
@@ -3279,7 +3308,7 @@ inline void get_remote_ip_and_port(socket_t sock, std::string &ip, int &port) {
 
   if (!getpeername(sock, reinterpret_cast<struct sockaddr *>(&addr),
                    &addr_len)) {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__SWITCH__)
     if (addr.ss_family == AF_UNIX) {
 #if defined(__linux__)
       struct ucred ucred;

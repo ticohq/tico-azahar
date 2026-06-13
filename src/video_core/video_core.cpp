@@ -33,7 +33,7 @@ std::unique_ptr<RendererBase> CreateRenderer(Frontend::EmuWindow& emu_window,
 #endif
 #ifdef ENABLE_VULKAN
     case Settings::GraphicsAPI::Vulkan:
-#if defined(ENABLE_SDL2) && !defined(__APPLE__)
+#if defined(ENABLE_SDL2) && !defined(__APPLE__) && !defined(__SWITCH__)
         // TODO: When we migrate to SDL3, refactor so that we don't need to init here.
         if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
             SDL_Init(SDL_INIT_VIDEO);

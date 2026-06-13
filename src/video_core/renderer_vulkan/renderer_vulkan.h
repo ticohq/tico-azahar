@@ -81,7 +81,21 @@ public:
     void NotifySurfaceChanged(bool second) override;
 
     void SwapBuffers() override;
-    void TryPresent(int timeout_ms, bool is_secondary) override {}
+    void TryPresent(int timeout_ms, bool is_secondary) override;
+
+#ifdef __SWITCH__
+    void RedrawCurrentFrame();
+
+    // Accessors used by the Switch tico overlay to initialize its own ImGui Vulkan
+    // backend and register a present-time draw callback. Switch never uses the
+    // libretro instance, so `instance` is always a plain Vulkan::Instance here.
+    const Instance& GetVulkanInstance() const {
+        return instance;
+    }
+    PresentWindow& GetMainPresentWindow() {
+        return main_present_window;
+    }
+#endif
 
 private:
     void ReloadPipeline(Settings::StereoRenderOption render_3d);
@@ -116,6 +130,9 @@ private:
 
     void LoadFBToScreenInfo(const Pica::FramebufferConfig& framebuffer, ScreenInfo& screen_info,
                             bool right_eye);
+    void UploadFramebufferToScreenInfo(const Pica::FramebufferConfig& framebuffer,
+                                       ScreenInfo& screen_info, PAddr framebuffer_addr,
+                                       u32 pixel_stride);
     void FillScreen(Common::Vec3<u8> color, const TextureInfo& texture);
 
 private:
@@ -131,6 +148,7 @@ private:
     RenderManager renderpass_cache;
     PresentWindow main_present_window;
     StreamBuffer vertex_buffer;
+    StreamBuffer framebuffer_upload_buffer;
     DescriptorUpdateQueue update_queue;
     RasterizerVulkan rasterizer;
     std::unique_ptr<PresentWindow> secondary_present_window_ptr;

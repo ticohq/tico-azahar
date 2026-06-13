@@ -44,7 +44,7 @@ public:
 private:
     void* GetRawSymbol(std::string_view name) const;
 
-    void* handle;
+    void* handle{};
     std::string load_error;
 };
 

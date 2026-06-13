@@ -4,6 +4,7 @@
 
 #include <mutex>
 #include <utility>
+#include "common/logging/log.h"
 #include "common/microprofile.h"
 #include "common/thread.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
@@ -18,6 +19,13 @@ MICROPROFILE_DEFINE(Vulkan_Submit, "Vulkan", "Submit Exectution", MP_RGB(255, 19
 namespace Vulkan {
 
 namespace {
+
+#ifdef __SWITCH__
+constexpr bool UseWorkerThreadOnSwitch = true;
+#else
+constexpr bool UseWorkerThreadOnSwitch = true;
+#endif
+
 
 std::unique_ptr<MasterSemaphore> MakeMasterSemaphore(const Instance& instance) {
 #ifdef HAVE_LIBRETRO
@@ -42,6 +50,7 @@ void Scheduler::CommandChunk::ExecuteAll(vk::CommandBuffer cmdbuf) {
         command = next;
     }
     submit = false;
+    recorded_counts = 0;
     command_offset = 0;
     first = nullptr;
     last = nullptr;
@@ -49,10 +58,10 @@ void Scheduler::CommandChunk::ExecuteAll(vk::CommandBuffer cmdbuf) {
 
 Scheduler::Scheduler(const Instance& instance)
     : master_semaphore{MakeMasterSemaphore(instance)},
-      command_pool{instance, master_semaphore.get()}, use_worker_thread{true} {
+      command_pool{instance, master_semaphore.get()}, use_worker_thread{UseWorkerThreadOnSwitch} {
     AllocateWorkerCommandBuffers();
+    AcquireNewChunk();
     if (use_worker_thread) {
-        AcquireNewChunk();
         worker_thread = std::jthread([this](std::stop_token token) { WorkerThread(token); });
     }
 }
@@ -73,6 +82,7 @@ void Scheduler::Finish(vk::Semaphore signal, vk::Semaphore wait) {
 
 void Scheduler::WaitWorker() {
     if (!use_worker_thread) {
+        DispatchWork();
         return;
     }
 
@@ -99,11 +109,22 @@ void Scheduler::Wait(u64 tick) {
 }
 
 void Scheduler::DispatchWork() {
-    if (!use_worker_thread || chunk->Empty()) {
+    if (chunk->Empty()) {
         return;
     }
 
-    on_dispatch();
+    if (on_dispatch) {
+        on_dispatch();
+    }
+
+    if (!use_worker_thread) {
+        const bool has_submit = chunk->HasSubmit();
+        chunk->ExecuteAll(current_cmdbuf);
+        if (has_submit) {
+            AllocateWorkerCommandBuffers();
+        }
+        return;
+    }
 
     {
         std::scoped_lock ql{queue_mutex};
@@ -116,6 +137,9 @@ void Scheduler::DispatchWork() {
 
 void Scheduler::WorkerThread(std::stop_token stop_token) {
     Common::SetCurrentThreadName("VulkanWorker");
+    // Allow cores 0 and 1; prefer core 1 (main is on core 2).
+    // Core 0 absorbs overflow when core 1 is busy.
+    Common::SetCurrentThreadAffinityMask(1, (1ULL << 0) | (1ULL << 1));
 
     const auto TryPopQueue{[this](auto& work) -> bool {
         if (work_queue.empty()) {
@@ -180,7 +204,9 @@ void Scheduler::SubmitExecution(vk::Semaphore signal_semaphore, vk::Semaphore wa
     state = StateFlags::AllDirty;
     const u64 signal_value = master_semaphore->NextTick();
 
-    on_submit();
+    if (on_submit) {
+        on_submit();
+    }
 
     Record([signal_semaphore, wait_semaphore, signal_value, this](vk::CommandBuffer cmdbuf) {
         MICROPROFILE_SCOPE(Vulkan_Submit);
@@ -189,13 +215,8 @@ void Scheduler::SubmitExecution(vk::Semaphore signal_semaphore, vk::Semaphore wa
     });
 
     master_semaphore->Refresh();
-
-    if (!use_worker_thread) {
-        AllocateWorkerCommandBuffers();
-    } else {
-        chunk->MarkSubmit();
-        DispatchWork();
-    }
+    chunk->MarkSubmit();
+    DispatchWork();
 }
 
 void Scheduler::AcquireNewChunk() {

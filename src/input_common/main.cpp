@@ -16,7 +16,11 @@
 #include "input_common/sdl/sdl.h"
 #include "input_common/sdl/sdl_impl.h"
 #include "input_common/touch_from_button.h"
+#if defined(__SWITCH__)
+#include "input_common/switch_hid.h"
+#else
 #include "input_common/udp/udp.h"
+#endif
 
 namespace InputCommon {
 
@@ -27,7 +31,9 @@ std::shared_ptr<GCAdapter::Adapter> gcadapter;
 #endif
 static std::shared_ptr<Keyboard> keyboard;
 static std::shared_ptr<MotionEmu> motion_emu;
+#if !defined(__SWITCH__)
 static std::unique_ptr<CemuhookUDP::State> udp;
+#endif
 static std::unique_ptr<SDL::State> sdl;
 
 void Init() {
@@ -47,9 +53,16 @@ void Init() {
     Input::RegisterFactory<Input::TouchDevice>("touch_from_button",
                                                std::make_shared<TouchFromButtonFactory>());
 
+#if defined(__SWITCH__)
+    SwitchHID::Init();
+    Input::RegisterFactory<Input::ButtonDevice>("switch_hid",
+                                                std::make_shared<SwitchHID::SwitchHIDButtonFactory>());
+    Input::RegisterFactory<Input::AnalogDevice>("switch_hid_analog",
+                                                std::make_shared<SwitchHID::SwitchHIDAnalogFactory>());
+#else
     sdl = SDL::Init();
-
     udp = CemuhookUDP::Init();
+#endif
 }
 
 void Shutdown() {
@@ -66,8 +79,14 @@ void Shutdown() {
     motion_emu.reset();
     Input::UnregisterFactory<Input::TouchDevice>("emu_window");
     Input::UnregisterFactory<Input::TouchDevice>("touch_from_button");
+#if defined(__SWITCH__)
+    Input::UnregisterFactory<Input::ButtonDevice>("switch_hid");
+    Input::UnregisterFactory<Input::AnalogDevice>("switch_hid_analog");
+    SwitchHID::Shutdown();
+#else
     sdl.reset();
     udp.reset();
+#endif
 }
 
 Keyboard* GetKeyboard() {
@@ -131,10 +150,12 @@ Common::ParamPackage GetControllerAnalogBinds(const Common::ParamPackage& params
 }
 
 void ReloadInputDevices() {
+#if !defined(__SWITCH__)
     if (!udp) {
         return;
     }
     udp->ReloadUDPClient();
+#endif
 }
 
 namespace Polling {

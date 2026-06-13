@@ -1,0 +1,335 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 753574e..e20fe19 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -207,9 +207,13 @@ if(HAVE_STRSEP)
+ 	add_definitions(-DHAVE_STRSEP)
+ endif()
+ 
+-check_function_exists(timegm HAVE_TIMEGM)
+-if(HAVE_TIMEGM)
+-	add_definitions(-DHAVE_TIMEGM)
++if(SWITCH)
++	set(HAVE_TIMEGM FALSE CACHE BOOL "Switch provides no public timegm declaration" FORCE)
++else()
++	check_function_exists(timegm HAVE_TIMEGM)
++	if(HAVE_TIMEGM)
++		add_definitions(-DHAVE_TIMEGM)
++	endif()
+ endif()
+ 
+ check_function_exists(arc4random_buf HAVE_ARC4RANDOM_BUF)
+@@ -242,19 +246,25 @@ if(HAVE_GETPAGESIZE)
+ 	add_definitions(-DHAVE_GETPAGESIZE)
+ endif()
+ 
+-check_function_exists(getprogname HAVE_GETPROGNAME)
+-if(HAVE_GETPROGNAME)
+-	add_definitions(-DHAVE_GETPROGNAME)
+-endif()
++if(SWITCH)
++	set(HAVE_GETPROGNAME FALSE CACHE BOOL "Switch provides no public getprogname declaration" FORCE)
++	set(HAVE_SYSLOG_R FALSE CACHE BOOL "Switch provides no syslog_r support" FORCE)
++	set(HAVE_SYSLOG FALSE CACHE BOOL "Switch provides no syslog support" FORCE)
++else()
++	check_function_exists(getprogname HAVE_GETPROGNAME)
++	if(HAVE_GETPROGNAME)
++		add_definitions(-DHAVE_GETPROGNAME)
++	endif()
+ 
+-check_function_exists(syslog_r HAVE_SYSLOG_R)
+-if(HAVE_SYSLOG_R)
+-	add_definitions(-DHAVE_SYSLOG_R)
+-endif()
++	check_function_exists(syslog_r HAVE_SYSLOG_R)
++	if(HAVE_SYSLOG_R)
++		add_definitions(-DHAVE_SYSLOG_R)
++	endif()
+ 
+-check_function_exists(syslog HAVE_SYSLOG)
+-if(HAVE_SYSLOG)
+-	add_definitions(-DHAVE_SYSLOG)
++	check_function_exists(syslog HAVE_SYSLOG)
++	if(HAVE_SYSLOG)
++		add_definitions(-DHAVE_SYSLOG)
++	endif()
+ endif()
+ 
+ check_symbol_exists(timespecsub sys/time.h HAVE_TIMESPECSUB)
+diff --git a/crypto/CMakeLists.txt b/crypto/CMakeLists.txt
+index a6842f5..30ee87d 100644
+--- a/crypto/CMakeLists.txt
++++ b/crypto/CMakeLists.txt
+@@ -776,8 +776,11 @@ set(
+ 	x509/x_all.c
+ )
+ 
+-if(UNIX)
++if(UNIX OR SWITCH)
+ 	set(CRYPTO_SRC ${CRYPTO_SRC} crypto_lock.c)
++endif()
++
++if(UNIX)
+ 	set(CRYPTO_SRC ${CRYPTO_SRC} bio/b_posix.c)
+ 	set(CRYPTO_SRC ${CRYPTO_SRC} bio/bss_log.c)
+ 	set(CRYPTO_SRC ${CRYPTO_SRC} ui/ui_openssl.c)
+diff --git a/include/compat/endian.h b/include/compat/endian.h
+index d9f7eb2..c7fe670 100644
+--- a/include/compat/endian.h
++++ b/include/compat/endian.h
+@@ -37,6 +37,113 @@
+ 
+ #endif
+ 
++#if defined(__SWITCH__)
++#include <stdint.h>
++
++#ifndef LITTLE_ENDIAN
++#define LITTLE_ENDIAN 1234
++#endif
++#ifndef BIG_ENDIAN
++#define BIG_ENDIAN 4321
++#endif
++#ifndef PDP_ENDIAN
++#define PDP_ENDIAN 3412
++#endif
++#ifndef BYTE_ORDER
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define BYTE_ORDER LITTLE_ENDIAN
++#else
++#define BYTE_ORDER BIG_ENDIAN
++#endif
++#endif
++
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#ifndef htobe16
++#define htobe16(x) __builtin_bswap16((uint16_t)(x))
++#endif
++#ifndef htobe32
++#define htobe32(x) __builtin_bswap32((uint32_t)(x))
++#endif
++#ifndef htobe64
++#define htobe64(x) __builtin_bswap64((uint64_t)(x))
++#endif
++#ifndef be16toh
++#define be16toh(x) __builtin_bswap16((uint16_t)(x))
++#endif
++#ifndef be32toh
++#define be32toh(x) __builtin_bswap32((uint32_t)(x))
++#endif
++#ifndef be64toh
++#define be64toh(x) __builtin_bswap64((uint64_t)(x))
++#endif
++#ifndef htole16
++#define htole16(x) ((uint16_t)(x))
++#endif
++#ifndef htole32
++#define htole32(x) ((uint32_t)(x))
++#endif
++#ifndef htole64
++#define htole64(x) ((uint64_t)(x))
++#endif
++#ifndef le16toh
++#define le16toh(x) ((uint16_t)(x))
++#endif
++#ifndef le32toh
++#define le32toh(x) ((uint32_t)(x))
++#endif
++#ifndef le64toh
++#define le64toh(x) ((uint64_t)(x))
++#endif
++#else
++#ifndef htobe16
++#define htobe16(x) ((uint16_t)(x))
++#endif
++#ifndef htobe32
++#define htobe32(x) ((uint32_t)(x))
++#endif
++#ifndef htobe64
++#define htobe64(x) ((uint64_t)(x))
++#endif
++#ifndef be16toh
++#define be16toh(x) ((uint16_t)(x))
++#endif
++#ifndef be32toh
++#define be32toh(x) ((uint32_t)(x))
++#endif
++#ifndef be64toh
++#define be64toh(x) ((uint64_t)(x))
++#endif
++#ifndef htole16
++#define htole16(x) __builtin_bswap16((uint16_t)(x))
++#endif
++#ifndef htole32
++#define htole32(x) __builtin_bswap32((uint32_t)(x))
++#endif
++#ifndef htole64
++#define htole64(x) __builtin_bswap64((uint64_t)(x))
++#endif
++#ifndef le16toh
++#define le16toh(x) __builtin_bswap16((uint16_t)(x))
++#endif
++#ifndef le32toh
++#define le32toh(x) __builtin_bswap32((uint32_t)(x))
++#endif
++#ifndef le64toh
++#define le64toh(x) __builtin_bswap64((uint64_t)(x))
++#endif
++#endif
++
++#ifndef betoh16
++#define betoh16 be16toh
++#endif
++#ifndef betoh32
++#define betoh32 be32toh
++#endif
++#ifndef betoh64
++#define betoh64 be64toh
++#endif
++#endif /* __SWITCH__ */
++
+ #ifndef __STRICT_ALIGNMENT
+ #define __STRICT_ALIGNMENT
+ #if defined(__i386)    || defined(__i386__)    || \
+diff --git a/include/compat/limits.h b/include/compat/limits.h
+index 73cccfc..fa44ce3 100644
+--- a/include/compat/limits.h
++++ b/include/compat/limits.h
+@@ -23,3 +23,9 @@
+ #define PATH_MAX MAXPATHLEN
+ #endif
+ #endif
++
++#ifdef __SWITCH__
++#ifndef SSIZE_MAX
++#define SSIZE_MAX LONG_MAX
++#endif
++#endif
+diff --git a/include/compat/netinet/in.h b/include/compat/netinet/in.h
+index d1afb27..34ca46f 100644
+--- a/include/compat/netinet/in.h
++++ b/include/compat/netinet/in.h
+@@ -16,4 +16,8 @@
+ typedef uint16_t in_port_t;
+ #endif
+ 
++#ifdef __SWITCH__
++#include <arpa/inet.h>
++#endif
++
+ #endif
+diff --git a/include/compat/sys/uio.h b/include/compat/sys/uio.h
+index b4aee9e..539051b 100644
+--- a/include/compat/sys/uio.h
++++ b/include/compat/sys/uio.h
+@@ -3,7 +3,7 @@
+  * sys/select.h compatibility shim
+  */
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__SWITCH__)
+ #include_next <sys/uio.h>
+ #else
+ 
+diff --git a/include/compat/syslog.h b/include/compat/syslog.h
+index f400ff6..0f4d969 100644
+--- a/include/compat/syslog.h
++++ b/include/compat/syslog.h
+@@ -3,21 +3,76 @@
+  * syslog.h compatibility shim
+  */
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__SWITCH__)
+ #include_next <syslog.h>
+ #endif
+ 
+ #ifndef LIBCRYPTOCOMPAT_SYSLOG_H
+ #define LIBCRYPTOCOMPAT_SYSLOG_H
+ 
+-#ifndef HAVE_SYSLOG_R
++#if !defined(HAVE_SYSLOG_R) || defined(__SWITCH__)
+ 
+ #include <stdarg.h>
+ 
+-#ifdef _WIN32
+-#define	LOG_INFO	6	/* informational */
+-#define LOG_USER    (1<<3)  /* random user-level messages */
+-#define	LOG_LOCAL2	(18<<3)	/* reserved for local use */
++#if defined(_WIN32) || defined(__SWITCH__)
++#ifndef LOG_EMERG
++#define LOG_EMERG   0       /* system is unusable */
++#endif
++#ifndef LOG_ALERT
++#define LOG_ALERT   1       /* action must be taken immediately */
++#endif
++#ifndef LOG_CRIT
++#define LOG_CRIT    2       /* critical conditions */
++#endif
++#ifndef LOG_ERR
++#define LOG_ERR     3       /* error conditions */
++#endif
++#ifndef LOG_WARNING
++#define LOG_WARNING 4       /* warning conditions */
++#endif
++#ifndef LOG_NOTICE
++#define LOG_NOTICE  5       /* normal but significant condition */
++#endif
++#ifndef LOG_INFO
++#define LOG_INFO    6       /* informational */
++#endif
++#ifndef LOG_DEBUG
++#define LOG_DEBUG   7       /* debug-level messages */
++#endif
++#ifndef LOG_PID
++#define LOG_PID     0x01    /* log the pid with each message */
++#endif
++#ifndef LOG_CONS
++#define LOG_CONS    0x02    /* log on the console if errors in sending */
++#endif
++#ifndef LOG_USER
++#define LOG_USER    (1 << 3) /* random user-level messages */
++#endif
++#ifndef LOG_DAEMON
++#define LOG_DAEMON  (3 << 3) /* system daemons */
++#endif
++#ifndef LOG_LOCAL2
++#define LOG_LOCAL2  (18 << 3) /* reserved for local use */
++#endif
++#endif
++
++#ifdef __SWITCH__
++static inline void openlog(const char *ident, int option, int facility)
++{
++    (void)ident;
++    (void)option;
++    (void)facility;
++}
++
++static inline void syslog(int priority, const char *format, ...)
++{
++    (void)priority;
++    (void)format;
++}
++
++static inline void closelog(void)
++{
++}
+ #endif
+ 
+ struct syslog_data {
+diff --git a/include/compat/unistd.h b/include/compat/unistd.h
+index 5e6ab1d..ea9e876 100644
+--- a/include/compat/unistd.h
++++ b/include/compat/unistd.h
+@@ -68,6 +68,10 @@ int getentropy(void *buf, size_t buflen);
+ int getpagesize(void);
+ #endif
+ 
++#ifndef HAVE_GETPROGNAME
++const char *getprogname(void);
++#endif
++
+ #define pledge(request, paths) 0
+ #define unveil(path, permissions) 0
+ 

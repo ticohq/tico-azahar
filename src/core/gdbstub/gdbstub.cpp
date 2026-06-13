@@ -4,6 +4,67 @@
 
 // Originally written by Sven Peter <sven@fail0verflow.com> for anergistic.
 
+#if defined(__SWITCH__)
+
+#include <cstddef>
+
+#include "core/gdbstub/gdbstub.h"
+
+namespace GDBStub {
+
+void SetServerPort(u16) {}
+void ToggleServer(bool) {}
+void Init() {}
+void DeferStart() {}
+void Shutdown() {}
+bool IsServerEnabled() {
+    return false;
+}
+bool IsConnected() {
+    return false;
+}
+void Break(bool) {}
+bool IsMemoryBreak() {
+    return false;
+}
+void HandlePacket(Core::System&) {}
+BreakpointAddress GetNextBreakpointFromAddress(VAddr, GDBStub::BreakpointType) {
+    return {0, GDBStub::BreakpointType::None};
+}
+bool CheckBreakpoint(VAddr, GDBStub::BreakpointType) {
+    return false;
+}
+bool GetCpuHaltFlag() {
+    return false;
+}
+void SetCpuHaltFlag(bool) {}
+bool GetCpuStepFlag() {
+    return false;
+}
+void SetCpuStepFlag(bool) {}
+void SendTrap(Kernel::Thread*, int) {}
+void SendReply(const char*) {}
+
+u32 HexToInt(const u8* src, std::size_t len) {
+    u32 value = 0;
+    for (std::size_t i = 0; i < len; ++i) {
+        const u8 c = src[i];
+        value <<= 4;
+        if (c >= '0' && c <= '9') {
+            value |= c - '0';
+        } else if (c >= 'a' && c <= 'f') {
+            value |= c - 'a' + 10;
+        } else if (c >= 'A' && c <= 'F') {
+            value |= c - 'A' + 10;
+        }
+    }
+    return value;
+}
+
+} // namespace GDBStub
+
+#else
+
 #include <algorithm>
 #include <atomic>
 #include <csignal>
@@ -1279,3 +1340,5 @@ void SendTrap(Kernel::Thread* thread, int trap) {
     send_trap = false;
 }
 }; // namespace GDBStub
+
+#endif // defined(__SWITCH__)

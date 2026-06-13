@@ -39,12 +39,15 @@ else()
     target_link_libraries(boost_serialization PUBLIC boost)
 
     # Boost::iostreams
-    add_library(
-        boost_iostreams
-        STATIC
+    set(boost_iostreams_SRC
         ${CMAKE_SOURCE_DIR}/externals/boost/libs/iostreams/src/file_descriptor.cpp
-        ${CMAKE_SOURCE_DIR}/externals/boost/libs/iostreams/src/mapped_file.cpp
     )
+    if (NOT SWITCH)
+        list(APPEND boost_iostreams_SRC
+            ${CMAKE_SOURCE_DIR}/externals/boost/libs/iostreams/src/mapped_file.cpp
+        )
+    endif()
+    add_library(boost_iostreams STATIC ${boost_iostreams_SRC})
     target_link_libraries(boost_iostreams PUBLIC boost)
     # Add additional boost libs here; remember to ALIAS them in the root CMakeLists!
 endif()
@@ -518,6 +521,35 @@ if (ENABLE_VULKAN)
     # adrenotools
     if (ANDROID AND "arm64" IN_LIST ARCHITECTURE)
         add_subdirectory(libadrenotools EXCLUDE_FROM_ALL)
+    endif()
+
+    # Dear ImGui (Switch tico overlay only)
+    if (SWITCH)
+        add_library(imgui STATIC
+            imgui/imgui/imgui.cpp
+            imgui/imgui/imgui_draw.cpp
+            imgui/imgui/imgui_tables.cpp
+            imgui/imgui/imgui_widgets.cpp
+            imgui/imgui/backends/imgui_impl_vulkan.cpp
+        )
+        target_include_directories(imgui PUBLIC
+            ./imgui
+            ./imgui/imgui
+            ./imgui/imgui/backends
+        )
+        target_compile_definitions(imgui PUBLIC
+            IMGUI_USER_CONFIG="imgui_user_config.h"
+            IMGUI_IMPL_VULKAN_NO_PROTOTYPES
+            IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS
+        )
+        target_link_libraries(imgui PUBLIC vulkan-headers)
+        target_disable_warnings(imgui)
+
+        # stb_image (header-only; expose include dir for the overlay TU that
+        # defines STB_IMAGE_IMPLEMENTATION)
+        add_library(stb INTERFACE)
+        target_include_directories(stb INTERFACE ./stb)
+        target_disable_warnings(stb)
     endif()
 endif()
 

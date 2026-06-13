@@ -39,6 +39,16 @@ constexpr u64 TEXTURE_BUFFER_SIZE = 2_MiB;
 constexpr vk::BufferUsageFlags BUFFER_USAGE =
     vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer;
 
+bool ShouldWaitForPipelineBuild(bool async_shaders, [[maybe_unused]] u32 num_vertices) {
+#ifdef __SWITCH__
+    // On Switch, transitions and UI effects often use tiny draws. Waiting for those pipelines
+    // defeats async shader compilation and stalls the emulation thread.
+    return !async_shaders;
+#else
+    return !async_shaders || num_vertices <= 6;
+#endif
+}
+
 struct DrawParams {
     u32 vertex_count;
     s32 vertex_offset;
@@ -463,7 +473,7 @@ bool RasterizerVulkan::AccelerateDrawBatchInternal(bool is_indexed) {
         SetupIndexArray();
     }
 
-    const bool wait_built = !async_shaders || regs.pipeline.num_vertices <= 6;
+    const bool wait_built = ShouldWaitForPipelineBuild(async_shaders, regs.pipeline.num_vertices);
     if (!pipeline_cache.BindPipeline(pipeline_info, wait_built)) {
         return true;
     }
@@ -602,9 +612,13 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     if (accelerate) {
         succeeded = AccelerateDrawBatchInternal(is_indexed);
     } else {
-        pipeline_cache.BindPipeline(pipeline_info, true);
-
         const u32 vertex_count = static_cast<u32>(vertex_batch.size());
+        const bool wait_built = ShouldWaitForPipelineBuild(async_shaders, vertex_count);
+        if (!pipeline_cache.BindPipeline(pipeline_info, wait_built)) {
+            vertex_batch.clear();
+            return true;
+        }
+
         const u32 vertex_size = vertex_count * sizeof(HardwareVertex);
         const auto [buffer, offset, _] = stream_buffer.Map(vertex_size, sizeof(HardwareVertex));
 

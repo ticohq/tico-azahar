@@ -2,6 +2,8 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include <atomic>
+
 #include <boost/container/static_vector.hpp>
 
 #include "common/common_paths.h"
@@ -56,6 +58,14 @@ AttribLoadFlags MakeAttribLoadFlag(Pica::PipelineRegs::VertexAttributeFormat for
     }
 }
 
+std::size_t GetPipelineWorkerThreadCount() {
+#ifdef __SWITCH__
+    return 1;
+#else
+    return std::max(std::thread::hardware_concurrency(), 2U) / 2;
+#endif
+}
+
 constexpr std::array<vk::DescriptorSetLayoutBinding, 6> BUFFER_BINDINGS = {{
     {0, vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex},
     {1, vk::DescriptorType::eUniformBufferDynamic, 1,
@@ -84,7 +94,7 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
                              RenderManager& renderpass_cache_, DescriptorUpdateQueue& update_queue_)
     : instance{instance_}, scheduler{scheduler_}, renderpass_cache{renderpass_cache_},
       update_queue{update_queue_},
-      num_worker_threads{std::max(std::thread::hardware_concurrency(), 2U) / 2},
+      num_worker_threads{GetPipelineWorkerThreadCount()},
       pipeline_workers{num_worker_threads, "Pipeline workers"},
       shader_workers{num_worker_threads, "Shader workers"},
       descriptor_heaps{
@@ -372,6 +382,15 @@ bool PipelineCache::BindPipeline(PipelineInfo& info, bool wait_built) {
 
     GraphicsPipeline* const pipeline = curr_disk_cache->GetPipeline(info);
     if (!pipeline->IsDone() && !pipeline->TryBuild(wait_built)) {
+#ifdef __SWITCH__
+        static std::atomic<u64> async_skip_count{};
+        const u64 skip_count = ++async_skip_count;
+        if ((skip_count & (skip_count - 1)) == 0) {
+            LOG_INFO(Render_Vulkan,
+                     "Switch async pipeline skip count={} wait_built={} pipeline_done=0",
+                     skip_count, wait_built ? 1 : 0);
+        }
+#endif
         return false;
     }
 

@@ -14,7 +14,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 // clang-format on
-#elif !defined(_WIN32)
+#elif !defined(_WIN32) && !defined(__SWITCH__)
 #ifndef __FreeBSD__
 #include <asm/hwcap.h>
 #endif // __FreeBSD__
@@ -35,6 +35,10 @@ static std::string GetCPUString() {
         return "Unknown";
     }
     return buf;
+}
+#elif defined(__SWITCH__)
+static std::string GetCPUString() {
+    return "Nintendo Switch Cortex-A57";
 }
 #elif !defined(WIN32)
 static std::string GetCPUString() {
@@ -67,7 +71,16 @@ static CPUCaps Detect() {
     caps.fma = true;
     caps.afp = false;
 
-#ifdef __APPLE__
+#ifdef __SWITCH__
+    // The Switch uses Cortex-A57 cores with the ARMv8 CRC and crypto extensions.
+    caps.fp = true;
+    caps.asimd = true;
+    caps.aes = true;
+    caps.crc32 = true;
+    caps.sha1 = true;
+    caps.sha2 = true;
+    caps.cpu_string = GetCPUString();
+#elif defined(__APPLE__)
     // M-series CPUs have all of these
     caps.fp = true;
     caps.asimd = true;

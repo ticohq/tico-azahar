@@ -110,6 +110,10 @@ enum class ThreadPriority : u32 {
 
 void SetCurrentThreadPriority(ThreadPriority new_priority);
 
+// Switch only: set preferred core and the bitmask of cores this thread may run on.
+// No-op on other platforms.
+void SetCurrentThreadAffinityMask(s32 preferred_core, u64 affinity_mask);
+
 void SetCurrentThreadName(const char* name);
 
 } // namespace Common

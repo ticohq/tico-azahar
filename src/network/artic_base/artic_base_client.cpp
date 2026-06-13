@@ -19,7 +19,9 @@
 #include <cerrno>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#ifndef __SWITCH__
 #include <ifaddrs.h>
+#endif
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>

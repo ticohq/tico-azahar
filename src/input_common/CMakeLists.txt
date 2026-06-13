@@ -12,13 +12,19 @@ add_library(input_common STATIC EXCLUDE_FROM_ALL
     touch_from_button.h
     sdl/sdl.cpp
     sdl/sdl.h
-    udp/client.cpp
-    udp/client.h
-    udp/protocol.cpp
-    udp/protocol.h
-    udp/udp.cpp
-    udp/udp.h
+    $<$<BOOL:${SWITCH}>:switch_hid.cpp switch_hid.h>
 )
+
+if(NOT SWITCH)
+    target_sources(input_common PRIVATE
+        udp/client.cpp
+        udp/client.h
+        udp/protocol.cpp
+        udp/protocol.h
+        udp/udp.cpp
+        udp/udp.h
+    )
+endif()
 
 if(ENABLE_SDL2)
     target_sources(input_common PRIVATE
