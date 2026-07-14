@@ -15,9 +15,11 @@ if (APPLE)
     set(DIST_DIR "../../dist/apple")
     set(APPLE_RESOURCES
         "${DIST_DIR}/azahar.icns"
-        "${DIST_DIR}/LaunchScreen.storyboard"
         "${DIST_DIR}/launch_logo.png"
     )
+    if (IOS)
+        list(APPEND APPLE_RESOURCES "${DIST_DIR}/LaunchScreen.storyboard")
+    endif()
     target_sources(citra_meta PRIVATE ${APPLE_RESOURCES})
 
     # Define app bundle metadata.
@@ -48,7 +50,27 @@ if (APPLE)
     endif()
 endif()
 
-target_link_libraries(citra_meta PRIVATE citra_common fmt)
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND MINGW)
+    # TODO: Do this for all executables, not just citra_meta
+    # TODO: Don't hardcode MXE directory to root?
+    set(dllwalker_command "${CMAKE_SOURCE_DIR}/externals/dllwalker/dllwalker.rb"
+                          $<TARGET_FILE:citra_meta>
+                          /mxe/usr/x86_64-w64-mingw32.shared/bin/
+                          /mxe/usr/x86_64-w64-mingw32.shared/qt6/bin/)
+    set(dll_list_filename "${CMAKE_CURRENT_BINARY_DIR}/required_dlls_list.txt")
+    add_custom_command(TARGET citra_meta POST_BUILD
+        COMMAND ${dllwalker_command} > ${dll_list_filename}
+    )
+    add_custom_command(TARGET citra_meta POST_BUILD
+        COMMAND cat ${dll_list_filename} | xargs -I {} ${CMAKE_COMMAND} -E copy {} $<TARGET_FILE_DIR:citra_meta>
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:citra_meta>/plugins/"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory /mxe/usr/x86_64-w64-mingw32.shared/qt6/plugins/ "$<TARGET_FILE_DIR:citra_meta>/plugins/"
+        COMMAND_EXPAND_LISTS
+        DEPENDS ${dll_list_filename}
+    )
+endif()
+
+target_link_libraries(citra_meta PRIVATE citra_cli citra_common fmt)
 
 if (ENABLE_QT)
     target_link_libraries(citra_meta PRIVATE citra_qt)
@@ -68,7 +90,7 @@ if (ENABLE_QT AND APPLE)
     target_link_libraries(citra_meta PRIVATE Qt6::GuiPrivate)
 endif()
 
-if (ENABLE_QT AND USE_DISCORD_PRESENCE)
+if (ENABLE_QT AND ENABLE_DISCORD_RPC)
     target_link_libraries(citra_meta PRIVATE discord-rpc)
 endif()
 

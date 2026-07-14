@@ -354,8 +354,8 @@ bool TextureRuntime::ClearTexture(Surface& surface, const VideoCore::TextureClea
                 .aspectMask = params.aspect,
                 .baseMipLevel = clear.texture_level,
                 .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = VK_REMAINING_ARRAY_LAYERS,
+                .baseArrayLayer = clear.texture_layer,
+                .layerCount = 1,
             };
 
             const vk::ImageMemoryBarrier pre_barrier = {
@@ -440,7 +440,8 @@ void TextureRuntime::ClearTextureWithRenderpass(Surface& surface,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = params.src_image,
-            .subresourceRange = MakeSubresourceRange(params.aspect, clear.texture_level),
+            .subresourceRange =
+                MakeSubresourceRange(params.aspect, clear.texture_level, 1, clear.texture_layer),
         };
 
         const vk::ImageMemoryBarrier post_barrier = {

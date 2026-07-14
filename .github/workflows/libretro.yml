@@ -17,7 +17,7 @@ permissions:
   attestations: write
 
 jobs:
-  android:
+  libretro-android:
     runs-on: ubuntu-22.04
     env:
       OS: android
@@ -28,7 +28,7 @@ jobs:
       BUILD_DIR: build/android-arm64-v8a
       EXTRA_PATH: bin/Release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Set tag name
@@ -62,7 +62,7 @@ jobs:
           output-file: libretro-android.spdx.json
           upload-artifact: false
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OS }}-${{ env.TARGET }}
           path: |
@@ -76,7 +76,7 @@ jobs:
             ./*.zip
           sbom-path: libretro-android.spdx.json
 
-  linux:
+  libretro-linux:
     runs-on: ubuntu-22.04
     env:
       OS: linux
@@ -85,7 +85,7 @@ jobs:
       EXTRA_PATH: bin/Release
       EXTRA_CORE_ARGS: -DCMAKE_C_COMPILER=gcc-12 -DCMAKE_CXX_COMPILER=g++-12 -DENABLE_LTO=OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Install tools
@@ -108,7 +108,7 @@ jobs:
           output-file: libretro-linux.spdx.json
           upload-artifact: false
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OS }}-${{ env.TARGET }}
           path: |
@@ -122,7 +122,7 @@ jobs:
             ./*.zip
           sbom-path: libretro-linux.spdx.json
 
-  windows:
+  libretro-windows:
     runs-on: ubuntu-latest
     env:
       OS: windows
@@ -133,7 +133,7 @@ jobs:
       IMAGE: reallibretroretroarch/libretro-build-mxe-win-cross-cores:mingw12
       EXTRA_PATH: bin/Release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build in cross-container
@@ -158,7 +158,7 @@ jobs:
           output-file: libretro-windows.spdx.json
           upload-artifact: false
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OS }}-${{ env.TARGET }}
           path: |
@@ -171,9 +171,10 @@ jobs:
           subject-path: |
             ./*.zip
           sbom-path: libretro-windows.spdx.json
-  macos:
+  libretro-macos:
     runs-on: macos-26
     strategy:
+      fail-fast: false
       matrix:
         target: ["x86_64", "arm64"]
     env:
@@ -183,7 +184,7 @@ jobs:
       BUILD_DIR: build/osx-${{ matrix.target }}
       EXTRA_PATH: bin/Release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Install tools
@@ -204,7 +205,7 @@ jobs:
           output-file: libretro-macos-${{ matrix.target }}.spdx.json
           upload-artifact: false
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OS }}-${{ env.TARGET }}
           path: |
@@ -218,7 +219,7 @@ jobs:
             ./*.zip
           sbom-path: libretro-macos-${{ matrix.target }}.spdx.json
 
-  ios:
+  libretro-ios:
     runs-on: macos-26
     env:
       OS: ios
@@ -227,7 +228,7 @@ jobs:
       EXTRA_PATH: bin/Release
       EXTRA_CORE_ARGS: -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_C_FLAGS=-DIOS -DCMAKE_CXX_FLAGS=-DIOS -DIOS=ON -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DENABLE_OPT=OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build
@@ -246,7 +247,7 @@ jobs:
           output-file: libretro-ios.spdx.json
           upload-artifact: false
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OS }}-${{ env.TARGET }}
           path: |
@@ -260,7 +261,7 @@ jobs:
             ./*.zip
           sbom-path: libretro-ios.spdx.json
 
-  tvos:
+  libretro-tvos:
     runs-on: macos-26
     env:
       OS: tvos
@@ -269,7 +270,7 @@ jobs:
       EXTRA_PATH: bin/Release
       EXTRA_CORE_ARGS: -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_C_FLAGS=-DIOS -DCMAKE_CXX_FLAGS=-DIOS -DIOS=ON -DCMAKE_SYSTEM_NAME=tvOS -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCMAKE_OSX_SYSROOT=appletvos -DCMAKE_OSX_ARCHITECTURES=arm64 -DENABLE_OPT=OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build
@@ -288,7 +289,7 @@ jobs:
           output-file: libretro-tvos.spdx.json
           upload-artifact: false
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.OS }}-${{ env.TARGET }}
           path: |

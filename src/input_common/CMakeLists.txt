@@ -29,6 +29,7 @@ endif()
 if(ENABLE_SDL2)
     target_sources(input_common PRIVATE
         sdl/sdl_impl.cpp
+        sdl/sdl_joystick.cpp
         sdl/sdl_impl.h
     )
     target_link_libraries(input_common PRIVATE SDL2::SDL2)

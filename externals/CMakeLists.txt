@@ -72,13 +72,6 @@ if(USE_SYSTEM_CRYPTOPP)
     add_library(cryptopp INTERFACE)
     target_link_libraries(cryptopp INTERFACE cryptopp::cryptopp)
 else()
-    if (WIN32 AND NOT MSVC AND "arm64" IN_LIST ARCHITECTURE)
-        # TODO: CryptoPP ARM64 ASM does not seem to support Windows unless compiled with MSVC.
-        # TODO: See https://github.com/weidai11/cryptopp/issues/1260
-        set(CRYPTOPP_DISABLE_ASM ON CACHE BOOL "")
-    endif()
-
-    set(CRYPTOPP_BUILD_DOCUMENTATION OFF CACHE BOOL "")
     set(CRYPTOPP_BUILD_TESTING OFF CACHE BOOL "")
     set(CRYPTOPP_INSTALL OFF CACHE BOOL "")
     set(CRYPTOPP_SOURCES "${CMAKE_SOURCE_DIR}/externals/cryptopp" CACHE STRING "")
@@ -287,7 +280,7 @@ if (ENABLE_CUBEB)
 endif()
 
 # DiscordRPC
-if (USE_DISCORD_PRESENCE)
+if (ENABLE_DISCORD_RPC)
     # rapidjson used by discord-rpc is old and doesn't correctly detect endianness for some platforms.
     include(TestBigEndian)
     test_big_endian(RAPIDJSON_BIG_ENDIAN)
@@ -330,12 +323,8 @@ endif()
 # OpenSSL
 if (USE_SYSTEM_OPENSSL)
     find_package(OpenSSL 1.1)
-    if (OPENSSL_FOUND)
-        set(OPENSSL_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
-    endif()
-endif()
-
-if (NOT OPENSSL_FOUND)
+    set(OPENSSL_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
+else()
     # LibreSSL
     set(LIBRESSL_SKIP_INSTALL ON CACHE BOOL "")
     set(OPENSSLDIR "/etc/ssl/")
@@ -417,6 +406,9 @@ if (ENABLE_OPENAL)
         find_package(OpenAL REQUIRED)
         target_link_libraries(OpenAL INTERFACE OpenAL::OpenAL)
     else()
+        if (BSD STREQUAL "OpenBSD")
+            set(ALSOFT_BACKEND_SOLARIS OFF CACHE BOOL "")
+        endif()
         set(ALSOFT_EMBED_HRTF_DATA OFF CACHE BOOL "")
         set(ALSOFT_EXAMPLES OFF CACHE BOOL "")
         set(ALSOFT_INSTALL OFF CACHE BOOL "")
