@@ -250,6 +250,11 @@ void DebugLog(const char* fmt, ...) {
 }
 
 bool QueueTicoReturn() {
+    if (!envHasNextLoad()) {
+        StartupLog("QueueTicoReturn: loader does not support envSetNextLoad");
+        return false;
+    }
+
     const char* target = nullptr;
     struct stat st {};
     if (stat(TicoLauncherPath, &st) == 0) {
@@ -896,9 +901,9 @@ int Run(int argc, char** argv) {
     if (rom_path.empty()) {
         DebugLog("no ROM path supplied");
         DebugClose();
-        QueueTicoReturn();
+        const bool queued_tico_return = QueueTicoReturn();
         appletUnlockExit();
-        return EXIT_FAILURE;
+        return queued_tico_return ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 
     StartupLog("Run: romfsInit");
@@ -963,9 +968,9 @@ int Run(int argc, char** argv) {
             romfsExit();
         }
         DebugClose();
-        QueueTicoReturn();
+        const bool queued_tico_return = QueueTicoReturn();
         appletUnlockExit();
-        return EXIT_FAILURE;
+        return queued_tico_return ? EXIT_SUCCESS : EXIT_FAILURE;
     }
     DebugLog("renderer resolution scale factor=%u",
              system.GPU().Renderer().GetResolutionScaleFactor());
@@ -1148,11 +1153,11 @@ int Run(int argc, char** argv) {
     DebugLog("shutdown step: DebugClose begin");
     DebugClose();
     DumpMemoryMap("after-shutdown");
-    QueueTicoReturn();
+    const bool queued_tico_return = QueueTicoReturn();
     StartupLog("Run: appletUnlockExit begin");
     const LibnxResult unlock_exit_rc = appletUnlockExit();
     StartupLog("Run: appletUnlockExit rc=0x%x", unlock_exit_rc);
-    return EXIT_SUCCESS;
+    return queued_tico_return ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 } // namespace
