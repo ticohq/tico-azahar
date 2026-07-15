@@ -72,7 +72,6 @@ constexpr const char* StderrLogPath = "sdmc:/tico/system/3ds/debug/stderr.txt";
 constexpr const char* FallbackRomPath = "sdmc:/tico/system/3ds/game.zcci";
 constexpr const char* MemMapLogPath = "sdmc:/tico/system/3ds/debug/memmap.txt";
 constexpr const char* TicoLauncherPath = "sdmc:/switch/tico/tico.nro";
-constexpr const char* LegacyTicoLauncherPath = "sdmc:/switch/tico.nro";
 // Temporary debug file gates. Flip these back on when collecting detailed boot logs.
 constexpr bool EnableStartupLogFile = false;
 constexpr bool EnableStdStreamLogs = false;
@@ -255,13 +254,10 @@ bool QueueTicoReturn() {
     struct stat st {};
     if (stat(TicoLauncherPath, &st) == 0) {
         target = TicoLauncherPath;
-    } else if (stat(LegacyTicoLauncherPath, &st) == 0) {
-        target = LegacyTicoLauncherPath;
     }
 
     if (!target) {
-        StartupLog("QueueTicoReturn: no launcher found at %s or %s", TicoLauncherPath,
-                   LegacyTicoLauncherPath);
+        StartupLog("QueueTicoReturn: no launcher found at %s", TicoLauncherPath);
         return false;
     }
 
