@@ -24,10 +24,15 @@ void Shutdown() {}
 bool IsServerEnabled() {
     return false;
 }
+bool IsInitialized() {
+    return false;
+}
 bool IsConnected() {
     return false;
 }
-void Break(bool) {}
+void Break(int) {}
+void OnProcessExit(u32) {}
+void OnThreadExit(u32) {}
 bool IsMemoryBreak() {
     return false;
 }
@@ -35,7 +40,7 @@ void HandlePacket(Core::System&) {}
 BreakpointAddress GetNextBreakpointFromAddress(VAddr, GDBStub::BreakpointType) {
     return {0, GDBStub::BreakpointType::None};
 }
-bool CheckBreakpoint(VAddr, GDBStub::BreakpointType) {
+bool CheckBreakpoint(VAddr, u32, GDBStub::BreakpointType) {
     return false;
 }
 bool GetCpuHaltFlag() {

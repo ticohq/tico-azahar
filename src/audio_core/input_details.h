@@ -27,6 +27,9 @@ enum class InputType : u32 {
 #ifdef HAVE_LIBRETRO
     LibRetro = 5,
 #endif
+#ifdef __SWITCH__
+    Libnx = 6,
+#endif
 };
 
 struct InputDetails {

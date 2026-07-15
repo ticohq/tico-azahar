@@ -619,7 +619,7 @@ void ConfigureSettings() {
     Settings::values.use_shader_jit.SetValue(true);
     Settings::values.resolution_factor.SetValue(1);
     Settings::values.use_vsync.SetValue(true);
-    Settings::values.frame_limit.SetValue(0.0); // 0 = unlimited; vsync handles pacing
+    Settings::values.frame_limit.SetValue(100.0);
     Settings::values.layout_option.SetValue(Settings::LayoutOption::Default);
     Settings::values.audio_emulation.SetValue(Settings::AudioEmulation::HLE);
     Settings::values.output_type.SetValue(AudioCore::SinkType::Auto);

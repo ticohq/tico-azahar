@@ -260,8 +260,8 @@ void RendererVulkan::PrepareDraw(Frame* frame, const Layout::FramebufferLayout& 
 }
 
 void RendererVulkan::RenderToWindow(PresentWindow& window, const Layout::FramebufferLayout& layout,
-                                    bool flipped) {
-    if (!Settings::values.use_skip_duplicate_frames.GetValue() ||
+                                    bool flipped, bool force_present) {
+    if (force_present || !Settings::values.use_skip_duplicate_frames.GetValue() ||
         Core::PerfStats::game_frames_updated) {
         Frame* frame = window.GetRenderFrame();
 
@@ -338,7 +338,7 @@ void RendererVulkan::TryPresent([[maybe_unused]] int timeout_ms, bool is_seconda
 void RendererVulkan::RedrawCurrentFrame() {
     const Layout::FramebufferLayout& layout = render_window.GetFramebufferLayout();
     PrepareRendertarget();
-    RenderToWindow(main_present_window, layout, false);
+    RenderToWindow(main_present_window, layout, false, true);
     scheduler.DispatchWork();
 }
 #endif

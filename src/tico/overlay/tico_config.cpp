@@ -6,7 +6,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdio>
+#include <initializer_list>
 #include <map>
 #include <optional>
 #include <string>
@@ -14,6 +16,7 @@
 
 #include <json.hpp>
 
+#include "audio_core/input_details.h"
 #include "common/logging/log.h"
 #include "common/settings.h"
 
@@ -123,11 +126,21 @@ std::string JsonScalarToString(const nlohmann::json& value) {
     return {};
 }
 
+std::string LowerCopy(std::string_view value) {
+    std::string out(value);
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return out;
+}
+
 std::optional<bool> ParseBool(std::string_view value) {
-    if (value == "true" || value == "1" || value == "on" || value == "yes") {
+    const std::string lower = LowerCopy(value);
+    if (lower == "true" || lower == "1" || lower == "on" || lower == "yes" ||
+        lower == "enabled") {
         return true;
     }
-    if (value == "false" || value == "0" || value == "off" || value == "no") {
+    if (lower == "false" || lower == "0" || lower == "off" || lower == "no" ||
+        lower == "disabled") {
         return false;
     }
     return std::nullopt;
@@ -146,6 +159,89 @@ std::optional<int> ParseInt(std::string_view value) {
     } catch (...) {
     }
     return std::nullopt;
+}
+
+std::optional<float> ParseFloat(std::string_view value) {
+    if (value.empty()) {
+        return std::nullopt;
+    }
+    try {
+        std::size_t consumed = 0;
+        const float result = std::stof(std::string(value), &consumed);
+        if (consumed == value.size()) {
+            return result;
+        }
+    } catch (...) {
+    }
+    return std::nullopt;
+}
+
+int ParseRegion(std::string_view value) {
+    const std::string lower = LowerCopy(value);
+    if (lower == "japan" || lower == "jp" || lower == "0") {
+        return 0;
+    }
+    if (lower == "usa" || lower == "us" || lower == "1") {
+        return 1;
+    }
+    if (lower == "europe" || lower == "eu" || lower == "2") {
+        return 2;
+    }
+    if (lower == "australia" || lower == "au" || lower == "3") {
+        return 3;
+    }
+    if (lower == "china" || lower == "cn" || lower == "4") {
+        return 4;
+    }
+    if (lower == "korea" || lower == "kr" || lower == "5") {
+        return 5;
+    }
+    if (lower == "taiwan" || lower == "tw" || lower == "6") {
+        return 6;
+    }
+    return Settings::REGION_VALUE_AUTO_SELECT;
+}
+
+AudioCore::InputType ParseInputType(std::string_view value) {
+    const std::string lower = LowerCopy(value);
+    if (lower == "none" || lower == "null") {
+        return AudioCore::InputType::Null;
+    }
+    if (lower == "static_noise" || lower == "static") {
+        return AudioCore::InputType::Static;
+    }
+    return AudioCore::InputType::Auto;
+}
+
+Settings::TextureFilter ParseTextureFilter(std::string_view value) {
+    const std::string lower = LowerCopy(value);
+    if (lower == "anime4k ultrafast" || lower == "anime4k") {
+        return Settings::TextureFilter::Anime4K;
+    }
+    if (lower == "bicubic") {
+        return Settings::TextureFilter::Bicubic;
+    }
+    if (lower == "scaleforce") {
+        return Settings::TextureFilter::ScaleForce;
+    }
+    if (lower == "xbrz" || lower == "xbrz freescale") {
+        return Settings::TextureFilter::xBRZ;
+    }
+    if (lower == "mmpx") {
+        return Settings::TextureFilter::MMPX;
+    }
+    return Settings::TextureFilter::NoFilter;
+}
+
+Settings::TextureSampling ParseTextureSampling(std::string_view value) {
+    const std::string lower = LowerCopy(value);
+    if (lower == "nearestneighbor" || lower == "nearest") {
+        return Settings::TextureSampling::NearestNeighbor;
+    }
+    if (lower == "linear") {
+        return Settings::TextureSampling::Linear;
+    }
+    return Settings::TextureSampling::GameControlled;
 }
 
 class Manager {
@@ -221,53 +317,140 @@ public:
         // Map the subset of tico options that translate cleanly onto azahar's
         // Settings. Unknown keys are ignored so the same config file can carry
         // options this core doesn't understand.
-        if (const auto v = GetOptional("upscale"); v) {
+        if (const auto v = GetFirstOptional({"upscale", "resolution_factor",
+                                             "citra_resolution_factor"});
+            v) {
             if (const auto factor = ParseInt(*v)) {
                 Settings::values.resolution_factor.SetValue(
                     static_cast<u16>(std::clamp(*factor, 0, 10)));
             }
         }
-        if (const auto v = GetOptional("new_3ds"); v) {
+        if (const auto v = GetFirstOptional({"new_3ds", "is_new_3ds", "citra_is_new_3ds"}); v) {
             if (const auto b = ParseBool(*v)) {
                 Settings::values.is_new_3ds.SetValue(*b);
+            } else {
+                Settings::values.is_new_3ds.SetValue(*v == "New 3DS");
             }
         }
-        if (const auto v = GetOptional("cpu_clock"); v) {
+        if (const auto v = GetFirstOptional({"cpu_clock", "cpu_clock_percentage",
+                                             "citra_cpu_clock_percentage"});
+            v) {
             if (const auto pct = ParseInt(*v)) {
                 Settings::values.cpu_clock_percentage.SetValue(std::clamp(*pct, 5, 400));
             }
         }
-        if (const auto v = GetOptional("shader_jit"); v) {
+        if (const auto v = GetFirstOptional({"region", "region_value", "citra_region_value"}); v) {
+            Settings::values.region_value.SetValue(ParseRegion(*v));
+        }
+        if (const auto v = GetFirstOptional({"input_type", "mic_input", "citra_input_type"}); v) {
+            Settings::values.input_type.SetValue(ParseInputType(*v));
+        }
+        if (const auto v = GetFirstOptional({"use_hw_shader", "hardware_shaders",
+                                             "citra_use_hw_shader", "citra_use_hw_shaders"});
+            v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.use_hw_shader.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"shader_jit", "use_shader_jit",
+                                             "citra_use_shader_jit"});
+            v) {
             if (const auto b = ParseBool(*v)) {
                 Settings::values.use_shader_jit.SetValue(*b);
             }
         }
-        if (const auto v = GetOptional("async_shaders"); v) {
+        if (const auto v = GetFirstOptional({"accurate_mul", "shaders_accurate_mul",
+                                             "citra_shaders_accurate_mul", "citra_use_acc_mul"});
+            v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.shaders_accurate_mul.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"disk_shader_cache", "use_disk_shader_cache",
+                                             "citra_use_disk_shader_cache",
+                                             "citra_use_hw_shader_cache"});
+            v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.use_disk_shader_cache.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"async_shaders", "async_shader_compilation"}); v) {
             if (const auto b = ParseBool(*v)) {
                 Settings::values.async_shader_compilation.SetValue(*b);
             }
         }
-        if (const auto v = GetOptional("vsync"); v) {
+        if (const auto v = GetFirstOptional({"vsync", "use_vsync"}); v) {
             if (const auto b = ParseBool(*v)) {
                 Settings::values.use_vsync.SetValue(*b);
             }
         }
-        if (const auto v = GetOptional("layout"); v) {
+        if (const auto v = GetFirstOptional({"simulate_3ds_gpu_timings",
+                                             "citra_simulate_3ds_gpu_timings"});
+            v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.simulate_3ds_gpu_timings.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"right_eye", "render_right_eye"}); v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.disable_right_eye_render.SetValue(!*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"disable_right_eye", "disable_right_eye_render",
+                                             "citra_disable_right_eye_render"});
+            v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.disable_right_eye_render.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"texture_filter", "citra_texture_filter"}); v) {
+            Settings::values.texture_filter.SetValue(ParseTextureFilter(*v));
+        }
+        if (const auto v = GetFirstOptional({"texture_sampling", "citra_texture_sampling"}); v) {
+            Settings::values.texture_sampling.SetValue(ParseTextureSampling(*v));
+        }
+        if (const auto v = GetFirstOptional({"custom_textures", "citra_custom_textures"}); v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.custom_textures.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"dump_textures", "citra_dump_textures"}); v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.dump_textures.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"use_virtual_sd", "citra_use_virtual_sd"}); v) {
+            if (const auto b = ParseBool(*v)) {
+                Settings::values.use_virtual_sd.SetValue(*b);
+            }
+        }
+        if (const auto v = GetFirstOptional({"layout", "layout_option", "citra_layout_option"});
+            v) {
             ApplyLayout(*v);
         }
-        if (const auto v = GetOptional("display_orientation"); v) {
+        if (const auto v = GetFirstOptional({"display_orientation", "orientation",
+                                             "upright_screen"});
+            v) {
             ApplyOrientation(*v);
-        } else if (const auto legacy = GetOptional("orientation"); legacy) {
-            ApplyOrientation(*legacy);
         }
         if (const auto v = GetOptional("display_size"); v) {
             ApplyDisplaySize(*v);
         } else if (const auto legacy = GetOptional("display_mode"); legacy) {
             ApplyDisplaySize(*legacy);
         }
-        if (const auto v = GetOptional("swap_screens"); v) {
+        if (const auto v = GetFirstOptional({"swap_screens", "swap_screen", "citra_swap_screen"});
+            v) {
             if (const auto b = ParseBool(*v)) {
                 Settings::values.swap_screen.SetValue(*b);
+            } else {
+                Settings::values.swap_screen.SetValue(*v == "Bottom");
+            }
+        }
+        if (const auto v = GetFirstOptional({"large_screen_proportion",
+                                             "citra_large_screen_proportion"});
+            v) {
+            if (const auto f = ParseFloat(*v)) {
+                Settings::values.large_screen_proportion.SetValue(std::clamp(*f, 1.0f, 16.0f));
             }
         }
     }
@@ -289,27 +472,37 @@ private:
         return it->second;
     }
 
+    std::optional<std::string> GetFirstOptional(
+        std::initializer_list<std::string_view> keys) const {
+        for (const std::string_view key : keys) {
+            if (const auto value = GetOptional(key)) {
+                return value;
+            }
+        }
+        return std::nullopt;
+    }
+
     static void ApplyLayout(std::string_view value) {
         using L = Settings::LayoutOption;
         L layout = L::Default;
-        if (value == "single" || value == "SingleScreen") {
+        const std::string lower = LowerCopy(value);
+        if (lower == "single" || lower == "single_screen" || value == "SingleScreen") {
             layout = L::SingleScreen;
-        } else if (value == "large" || value == "LargeScreen") {
+        } else if (lower == "large" || lower == "large_screen" || value == "LargeScreen") {
             layout = L::LargeScreen;
-        } else if (value == "side" || value == "SideScreen") {
+        } else if (lower == "side" || lower == "side_by_side" || value == "SideScreen") {
             layout = L::SideScreen;
-        } else if (value == "hybrid" || value == "HybridScreen") {
+        } else if (lower == "hybrid" || lower == "hybrid_screen" || value == "HybridScreen") {
             layout = L::HybridScreen;
         }
         Settings::values.layout_option.SetValue(layout);
     }
 
     static void ApplyOrientation(std::string_view value) {
-        if (value == "vertical" || value == "Vertical" || value == "portrait" ||
-            value == "Portrait") {
+        const std::string lower = LowerCopy(value);
+        if (lower == "vertical" || lower == "portrait") {
             Settings::values.upright_screen.SetValue(true);
-        } else if (value == "horizontal" || value == "Horizontal" || value == "landscape" ||
-                   value == "Landscape") {
+        } else if (lower == "horizontal" || lower == "landscape") {
             Settings::values.upright_screen.SetValue(false);
         } else if (const auto b = ParseBool(value)) {
             Settings::values.upright_screen.SetValue(*b);
@@ -317,10 +510,10 @@ private:
     }
 
     static void ApplyDisplaySize(std::string_view value) {
-        const bool stretch = value == "Stretch" || value == "stretch";
-        const bool original = value == "Original" || value == "original" || value == "Integer" ||
-                              value == "integer" || value == "1x" || value == "2x" ||
-                              value == "Auto";
+        const std::string lower = LowerCopy(value);
+        const bool stretch = lower == "stretch";
+        const bool original = lower == "original" || lower == "integer" || lower == "1x" ||
+                              lower == "2x" || lower == "auto";
 
         Settings::values.aspect_ratio.SetValue(stretch ? Settings::AspectRatio::Stretch
                                                        : Settings::AspectRatio::Default);

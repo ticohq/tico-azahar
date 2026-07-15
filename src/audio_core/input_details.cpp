@@ -18,6 +18,9 @@
 #ifdef HAVE_LIBRETRO
 #include "audio_core/libretro_input.h"
 #endif
+#ifdef __SWITCH__
+#include "audio_core/libnx_input.h"
+#endif
 #include "common/logging/log.h"
 #include "core/core.h"
 
@@ -25,6 +28,18 @@ namespace AudioCore {
 namespace {
 // input_details is ordered in terms of desirability, with the best choice at the top.
 constexpr std::array input_details = {
+#ifdef __SWITCH__
+    InputDetails{InputType::Libnx, "Switch Audio Input", true,
+                 [](Core::System& system, std::string_view device_id) -> std::unique_ptr<Input> {
+                     if (!system.HasMicPermission()) {
+                         LOG_WARNING(Audio,
+                                     "Microphone permission denied, falling back to null input.");
+                         return std::make_unique<NullInput>();
+                     }
+                     return std::make_unique<LibnxInput>();
+                 },
+                 &ListLibnxInputDevices},
+#endif
 #ifdef HAVE_LIBRETRO
     InputDetails{InputType::LibRetro, "Real Device (LibRetro)", true,
                  [](Core::System& system, std::string_view device_id) -> std::unique_ptr<Input> {
