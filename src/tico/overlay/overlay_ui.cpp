@@ -38,6 +38,7 @@ constexpr std::array<QuickMenuItem, 4> kQuickMenuItems = {{
 constexpr int kOverlaySlotCount = 4;
 constexpr int kSettingsItemCount = 3;
 constexpr int kToastSlotCount = 4;
+constexpr float kMenuWidth = 480.0f;
 
 constexpr float kAnimDuration = 0.4f;
 constexpr float kToastDuration = 2.0f;
@@ -262,17 +263,28 @@ void SaveViewportSettings() {
 }
 
 void SaveDisplaySettings() {
-    TicoConfig::SetConfigValue("display_orientation",
-                               Settings::values.upright_screen.GetValue() ? "vertical"
-                                                                          : "horizontal");
+    const bool vertical = Settings::values.upright_screen.GetValue();
+    const bool inverted = Settings::values.screen_rotation_180.GetValue();
+    const char* orientation =
+        vertical ? (inverted ? "vertical_inverted" : "vertical")
+                 : (inverted ? "horizontal_inverted" : "horizontal");
+    TicoConfig::SetConfigValue("display_orientation", orientation);
+    TicoConfig::SetConfigValue("display_rotation", inverted ? "180" : "0");
+    TicoConfig::SetConfigValue("screen_rotation_180", inverted ? "true" : "false");
     TicoConfig::SetConfigValue("layout",
                                ToConfigValue(Settings::values.layout_option.GetValue()));
     TicoConfig::SaveConfig();
 }
 
 std::string GetOrientationValueLabel() {
-    return Settings::values.upright_screen.GetValue() ? TrOr("emulator_vertical", "Vertical")
-                                                      : TrOr("emulator_horizontal", "Horizontal");
+    const bool vertical = Settings::values.upright_screen.GetValue();
+    const bool inverted = Settings::values.screen_rotation_180.GetValue();
+    if (vertical) {
+        return inverted ? TrOr("emulator_vertical_inverted", "Vertical Inverted")
+                        : TrOr("emulator_vertical", "Vertical");
+    }
+    return inverted ? TrOr("emulator_horizontal_inverted", "Horizontal Inverted")
+                    : TrOr("emulator_horizontal", "Horizontal");
 }
 
 std::string GetLayoutValueLabel() {
@@ -324,7 +336,17 @@ void AdvanceSettingsValue(int direction) {
         return;
 
     if (s_settings_selected == 0) {
-        Settings::values.upright_screen.SetValue(!Settings::values.upright_screen.GetValue());
+        const bool vertical = Settings::values.upright_screen.GetValue();
+        const bool inverted = Settings::values.screen_rotation_180.GetValue();
+        int index = vertical ? (inverted ? 3 : 1) : (inverted ? 2 : 0);
+        index += direction;
+        if (index < 0) {
+            index = 3;
+        } else if (index > 3) {
+            index = 0;
+        }
+        Settings::values.upright_screen.SetValue(index == 1 || index == 3);
+        Settings::values.screen_rotation_180.SetValue(index == 2 || index == 3);
         SaveDisplaySettings();
     } else if (s_settings_selected == 1) {
         const Settings::LayoutOption current = Settings::values.layout_option.GetValue();
@@ -415,7 +437,7 @@ void RenderTitleCard(ImDrawList* dl, ImVec2 display_size, float ease) {
 void RenderMenu(ImDrawList* dl, ImVec2 display_size, float ease) {
     if (s_menu == MenuScreen::Settings) {
         const float scale = ImGui::GetIO().FontGlobalScale;
-        const float menu_width = 400.0f * scale;
+        const float menu_width = kMenuWidth * scale;
         const float item_height = 64.0f * scale;
         const float content_height = static_cast<float>(kSettingsItemCount) * item_height;
         const ImVec2 menu_size(menu_width, content_height);
@@ -467,7 +489,6 @@ void RenderMenu(ImDrawList* dl, ImVec2 display_size, float ease) {
                 value = GetLayoutValueLabel();
                 break;
             case 2:
-            default:
                 label = TrOr("emulator_display_size", "Display Size");
                 value = GetViewportValueLabel();
                 break;
@@ -508,7 +529,7 @@ void RenderMenu(ImDrawList* dl, ImVec2 display_size, float ease) {
 
     const bool showing_slots = s_menu == MenuScreen::SaveStates || s_menu == MenuScreen::LoadStates;
     const float scale = ImGui::GetIO().FontGlobalScale;
-    const float menu_width = 400.0f * scale;
+    const float menu_width = kMenuWidth * scale;
     const float item_height = 64.0f * scale;
     const int item_count =
         showing_slots ? kOverlaySlotCount : static_cast<int>(kQuickMenuItems.size());

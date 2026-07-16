@@ -379,7 +379,7 @@ FramebufferLayout CustomFrameLayout(u32 width, u32 height, bool is_swapped, bool
         std::swap(width, height);
     }
     FramebufferLayout res{
-        width, height, true, true, {}, {}, !Settings::values.upright_screen, is_portrait_mode};
+        width, height, true, true, {}, {}, !Settings::values.upright_screen, false, is_portrait_mode};
     float opacity_value = Settings::values.custom_second_layer_opacity.GetValue() / 100.0f;
 
     if (!is_portrait_mode && opacity_value < 1) {
@@ -570,6 +570,10 @@ FramebufferLayout FrameLayoutFromResolutionScale(u32 res_scale, bool is_secondar
         }
     }
 
+    if (Settings::values.screen_rotation_180.GetValue()) {
+        layout = rotate180Layout(layout);
+    }
+
     return layout;
     UNREACHABLE();
 }
@@ -691,6 +695,22 @@ FramebufferLayout reverseLayout(FramebufferLayout layout) {
         layout.additional_screen.top = layout.height - oldRight;
         layout.additional_screen.bottom = layout.height - oldLeft;
     }
+    return layout;
+}
+
+FramebufferLayout rotate180Layout(FramebufferLayout layout) {
+    const auto rotate_rect = [width = layout.width,
+                              height = layout.height](Common::Rectangle<u32> rect) {
+        return Common::Rectangle<u32>{width - rect.right, height - rect.bottom, width - rect.left,
+                                      height - rect.top};
+    };
+
+    layout.top_screen = rotate_rect(layout.top_screen);
+    layout.bottom_screen = rotate_rect(layout.bottom_screen);
+    if (layout.additional_screen_enabled) {
+        layout.additional_screen = rotate_rect(layout.additional_screen);
+    }
+    layout.is_flipped = !layout.is_flipped;
     return layout;
 }
 

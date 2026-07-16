@@ -289,7 +289,9 @@ public:
     bool SaveConfig() {
         nlohmann::json root = nlohmann::json::object();
         for (const auto& [key, value] : options) {
-            if (const auto b = ParseBool(value)) {
+            if (IsUsernameKey(key)) {
+                root[key] = value;
+            } else if (const auto b = ParseBool(value)) {
                 root[key] = *b;
             } else if (const auto i = ParseInt(value)) {
                 root[key] = *i;
@@ -428,10 +430,15 @@ public:
             v) {
             ApplyLayout(*v);
         }
-        if (const auto v = GetFirstOptional({"display_orientation", "orientation",
-                                             "upright_screen"});
-            v) {
-            ApplyOrientation(*v);
+        const auto orientation = GetFirstOptional({"display_orientation", "orientation",
+                                                   "upright_screen"});
+        if (orientation) {
+            ApplyOrientation(*orientation);
+        }
+        if (const auto v = GetFirstOptional({"display_rotation", "rotation",
+                                             "screen_rotation_180", "rotate_180"});
+            v && !orientation) {
+            ApplyRotation(*v);
         }
         if (const auto v = GetOptional("display_size"); v) {
             ApplyDisplaySize(*v);
@@ -463,7 +470,29 @@ public:
         return options.size();
     }
 
+    std::string GetConfiguredUsername() const {
+        if (const auto v = GetFirstOptional({"username", "profile_name", "user_name",
+                                             "system_username", "citra_username"});
+            v) {
+            return *v;
+        }
+        return {};
+    }
+
+    std::string GetConfiguredSystemLanguage() const {
+        if (const auto v = GetFirstOptional({"language", "system_language", "citra_language"});
+            v) {
+            return *v;
+        }
+        return {};
+    }
+
 private:
+    static bool IsUsernameKey(std::string_view key) {
+        return key == "username" || key == "profile_name" || key == "user_name" ||
+               key == "system_username" || key == "citra_username";
+    }
+
     std::optional<std::string> GetOptional(std::string_view key) const {
         const auto it = options.find(key);
         if (it == options.end()) {
@@ -502,10 +531,32 @@ private:
         const std::string lower = LowerCopy(value);
         if (lower == "vertical" || lower == "portrait") {
             Settings::values.upright_screen.SetValue(true);
+            Settings::values.screen_rotation_180.SetValue(false);
         } else if (lower == "horizontal" || lower == "landscape") {
             Settings::values.upright_screen.SetValue(false);
+            Settings::values.screen_rotation_180.SetValue(false);
+        } else if (lower == "vertical_inverted" || lower == "vertical-inverted" ||
+                   lower == "portrait_inverted" || lower == "portrait-inverted") {
+            Settings::values.upright_screen.SetValue(true);
+            Settings::values.screen_rotation_180.SetValue(true);
+        } else if (lower == "horizontal_inverted" || lower == "horizontal-inverted" ||
+                   lower == "landscape_inverted" || lower == "landscape-inverted") {
+            Settings::values.upright_screen.SetValue(false);
+            Settings::values.screen_rotation_180.SetValue(true);
         } else if (const auto b = ParseBool(value)) {
             Settings::values.upright_screen.SetValue(*b);
+            Settings::values.screen_rotation_180.SetValue(false);
+        }
+    }
+
+    static void ApplyRotation(std::string_view value) {
+        const std::string lower = LowerCopy(value);
+        if (lower == "180" || lower == "180deg" || lower == "flipped" || lower == "upside_down") {
+            Settings::values.screen_rotation_180.SetValue(true);
+        } else if (lower == "0" || lower == "0deg" || lower == "normal") {
+            Settings::values.screen_rotation_180.SetValue(false);
+        } else if (const auto b = ParseBool(value)) {
+            Settings::values.screen_rotation_180.SetValue(*b);
         }
     }
 
@@ -565,6 +616,14 @@ std::string GetLoadedConfigPath() {
 
 std::size_t GetLoadedOptionCount() {
     return GetManager().GetLoadedOptionCount();
+}
+
+std::string GetConfiguredUsername() {
+    return GetManager().GetConfiguredUsername();
+}
+
+std::string GetConfiguredSystemLanguage() {
+    return GetManager().GetConfiguredSystemLanguage();
 }
 
 } // namespace SwitchFrontend::TicoConfig

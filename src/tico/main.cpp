@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <csignal>
 #include <cstdarg>
 #include <cstddef>
@@ -17,6 +18,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -31,10 +33,12 @@
 #include "common/logging/backend.h"
 #include "common/param_package.h"
 #include "common/settings.h"
+#include "common/string_util.h"
 #include "core/core.h"
 #include "core/frontend/applets/default_applets.h"
 #include "core/frontend/image_interface.h"
 #include "core/hle/kernel/kernel.h"
+#include "core/hle/service/cfg/cfg.h"
 #include "core/hle/service/service.h"
 #include "core/loader/loader.h"
 #include "core/savestate.h"
@@ -446,6 +450,53 @@ void PinCurrentThreadToCore(s32 core, const char* tag) {
              static_cast<unsigned long long>(affinity_mask));
 }
 
+class ThreadCoreMaskGuard {
+public:
+    ThreadCoreMaskGuard() {
+        const LibnxResult rc =
+            svcGetThreadCoreMask(&original_preferred_core, &original_affinity_mask,
+                                 CUR_THREAD_HANDLE);
+        restore_available = rc == 0;
+        DebugLog("thread affinity capture: rc=0x%x preferred=%d affinity=0x%llx", rc,
+                 original_preferred_core,
+                 static_cast<unsigned long long>(original_affinity_mask));
+    }
+
+    ~ThreadCoreMaskGuard() {
+        Restore("destructor");
+    }
+
+    void Restore(const char* tag) {
+        if (!restore_available || restored) {
+            return;
+        }
+
+        // Chainloaded NROs run on hbloader's same process/thread context. Do not hand Tico
+        // a single-core affinity inherited from this core or from Tico's own launch path.
+        const LibnxResult app_core_rc = svcSetThreadCoreMask(CUR_THREAD_HANDLE, 0, 0x7);
+        restored = app_core_rc == 0;
+        if (!restored) {
+            const LibnxResult fallback_rc = svcSetThreadCoreMask(
+                CUR_THREAD_HANDLE, original_preferred_core, original_affinity_mask);
+            restored = fallback_rc == 0;
+            DebugLog("thread affinity restore %s: app_core_rc=0x%x fallback preferred=%d "
+                     "affinity=0x%llx fallback_rc=0x%x",
+                     tag, app_core_rc, original_preferred_core,
+                     static_cast<unsigned long long>(original_affinity_mask), fallback_rc);
+            return;
+        }
+
+        DebugLog("thread affinity restore %s: preferred=0 affinity=0x7 rc=0x%x", tag,
+                 app_core_rc);
+    }
+
+private:
+    s32 original_preferred_core = -1;
+    u64 original_affinity_mask = 0;
+    bool restore_available = false;
+    bool restored = false;
+};
+
 void InstallFatalHandlers() {
     StartupLog("InstallFatalHandlers");
     std::set_terminate([] {
@@ -656,6 +707,7 @@ void ConfigureSettings() {
     };
     profile.analogs[Settings::NativeAnalog::CirclePad] = MakeAnalog(0);
     profile.analogs[Settings::NativeAnalog::CStick]    = MakeAnalog(1);
+    profile.motion_device = "engine:switch_hid_motion";
     profile.touch_device = "engine:emu_window";
     profile.controller_touch_device.clear();
     profile.use_touchpad = false;
@@ -881,6 +933,108 @@ bool HandleOverlayAction(Core::System& system, SwitchFrontend::OverlayUI::Action
     return false;
 }
 
+std::string LowerCopy(std::string_view value) {
+    std::string out(value);
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return out;
+}
+
+bool TryParseSystemLanguage(std::string_view value, Service::CFG::SystemLanguage& language) {
+    const std::string lower = LowerCopy(value);
+    if (lower == "japanese" || lower == "jp" || lower == "ja" || lower == "0") {
+        language = Service::CFG::LANGUAGE_JP;
+        return true;
+    }
+    if (lower == "english" || lower == "en" || lower == "1") {
+        language = Service::CFG::LANGUAGE_EN;
+        return true;
+    }
+    if (lower == "french" || lower == "fr" || lower == "2") {
+        language = Service::CFG::LANGUAGE_FR;
+        return true;
+    }
+    if (lower == "german" || lower == "de" || lower == "3") {
+        language = Service::CFG::LANGUAGE_DE;
+        return true;
+    }
+    if (lower == "italian" || lower == "it" || lower == "4") {
+        language = Service::CFG::LANGUAGE_IT;
+        return true;
+    }
+    if (lower == "spanish" || lower == "es" || lower == "5") {
+        language = Service::CFG::LANGUAGE_ES;
+        return true;
+    }
+    if (lower == "simplified chinese" || lower == "simplified_chinese" || lower == "zh" ||
+        lower == "zh-cn" || lower == "6") {
+        language = Service::CFG::LANGUAGE_ZH;
+        return true;
+    }
+    if (lower == "korean" || lower == "ko" || lower == "kr" || lower == "7") {
+        language = Service::CFG::LANGUAGE_KO;
+        return true;
+    }
+    if (lower == "dutch" || lower == "nl" || lower == "8") {
+        language = Service::CFG::LANGUAGE_NL;
+        return true;
+    }
+    if (lower == "portuguese" || lower == "pt" || lower == "9") {
+        language = Service::CFG::LANGUAGE_PT;
+        return true;
+    }
+    if (lower == "russian" || lower == "ru" || lower == "10") {
+        language = Service::CFG::LANGUAGE_RU;
+        return true;
+    }
+    if (lower == "traditional chinese" || lower == "traditional_chinese" || lower == "tw" ||
+        lower == "zh-tw" || lower == "11") {
+        language = Service::CFG::LANGUAGE_TW;
+        return true;
+    }
+    return false;
+}
+
+void ApplyConfiguredSystemLanguage(Core::System& system) {
+    const std::string language_value = SwitchFrontend::TicoConfig::GetConfiguredSystemLanguage();
+    if (language_value.empty()) {
+        return;
+    }
+
+    Service::CFG::SystemLanguage language = Service::CFG::LANGUAGE_EN;
+    if (!TryParseSystemLanguage(language_value, language)) {
+        DebugLog("invalid configured 3ds language: %s", language_value.c_str());
+        return;
+    }
+
+    auto cfg = Service::CFG::GetModule(system);
+    cfg->SetSystemLanguage(language);
+    const Result rc = cfg->UpdateConfigNANDSavegame();
+    DebugLog("configured 3ds language: %s (%u) rc=0x%x", language_value.c_str(),
+             static_cast<unsigned>(language), rc.raw);
+}
+
+void ApplyConfiguredUsername(Core::System& system) {
+    std::string username = SwitchFrontend::TicoConfig::GetConfiguredUsername();
+    if (username.empty()) {
+        return;
+    }
+
+    std::u16string username_utf16 = Common::UTF8ToUTF16(username);
+    if (username_utf16.empty()) {
+        return;
+    }
+    if (username_utf16.size() > 10) {
+        username_utf16.resize(10);
+        username = Common::UTF16ToUTF8(username_utf16);
+    }
+
+    auto cfg = Service::CFG::GetModule(system);
+    cfg->SetUsername(username_utf16);
+    const Result rc = cfg->UpdateConfigNANDSavegame();
+    DebugLog("configured 3ds username: %s rc=0x%x", username.c_str(), rc.raw);
+}
+
 int Run(int argc, char** argv) {
     OpenStartupLogIfNeeded("a");
     StartupLog("Run: entry argc=%d", argc);
@@ -889,6 +1043,7 @@ int Run(int argc, char** argv) {
     StartupLog("Run: appletLockExit rc=0x%x", lock_exit_rc);
     DebugOpen();
     InstallFatalHandlers();
+    ThreadCoreMaskGuard thread_core_guard;
 
     DebugLog("argc=%d", argc);
     for (int i = 0; i < argc; i++) {
@@ -900,6 +1055,7 @@ int Run(int argc, char** argv) {
     const std::string display_title = GetDisplayTitle(argc, argv, rom_path);
     if (rom_path.empty()) {
         DebugLog("no ROM path supplied");
+        thread_core_guard.Restore("no-rom");
         DebugClose();
         const bool queued_tico_return = QueueTicoReturn();
         appletUnlockExit();
@@ -910,10 +1066,6 @@ int Run(int argc, char** argv) {
     const LibnxResult romfs_result = romfsInit();
     const bool romfs_initialized = romfs_result == 0;
     DebugLog("romfsInit=0x%x", romfs_result);
-
-    StartupLog("Run: apm performance config");
-    apmSetPerformanceConfiguration(ApmPerformanceMode_Normal, 0x92220007);
-    apmSetPerformanceConfiguration(ApmPerformanceMode_Boost, 0x92220008);
 
     StartupLog("Run: pin main thread affinity");
     PinCurrentThreadToCore(2, "main");
@@ -967,11 +1119,14 @@ int Run(int argc, char** argv) {
         if (romfs_initialized) {
             romfsExit();
         }
+        thread_core_guard.Restore("load-failed");
         DebugClose();
         const bool queued_tico_return = QueueTicoReturn();
         appletUnlockExit();
         return queued_tico_return ? EXIT_SUCCESS : EXIT_FAILURE;
     }
+    ApplyConfiguredSystemLanguage(system);
+    ApplyConfiguredUsername(system);
     DebugLog("renderer resolution scale factor=%u",
              system.GPU().Renderer().GetResolutionScaleFactor());
 
@@ -1150,10 +1305,11 @@ int Run(int argc, char** argv) {
         romfsExit();
         DebugLog("shutdown step: romfsExit done");
     }
+    thread_core_guard.Restore("normal-shutdown");
     DebugLog("shutdown step: DebugClose begin");
     DebugClose();
-    DumpMemoryMap("after-shutdown");
     const bool queued_tico_return = QueueTicoReturn();
+    DumpMemoryMap("after-shutdown");
     StartupLog("Run: appletUnlockExit begin");
     const LibnxResult unlock_exit_rc = appletUnlockExit();
     StartupLog("Run: appletUnlockExit rc=0x%x", unlock_exit_rc);

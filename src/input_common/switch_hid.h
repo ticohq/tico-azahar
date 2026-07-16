@@ -29,6 +29,11 @@ public:
     std::unique_ptr<Input::AnalogDevice> Create(const Common::ParamPackage& params) override;
 };
 
+class SwitchHIDMotionFactory final : public Input::Factory<Input::MotionDevice> {
+public:
+    std::unique_ptr<Input::MotionDevice> Create(const Common::ParamPackage& params) override;
+};
+
 } // namespace SwitchHID
 } // namespace InputCommon
 

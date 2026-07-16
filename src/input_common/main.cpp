@@ -60,6 +60,8 @@ void Init() {
                                                 std::make_shared<SwitchHID::SwitchHIDButtonFactory>());
     Input::RegisterFactory<Input::AnalogDevice>("switch_hid_analog",
                                                 std::make_shared<SwitchHID::SwitchHIDAnalogFactory>());
+    Input::RegisterFactory<Input::MotionDevice>(
+        "switch_hid_motion", std::make_shared<SwitchHID::SwitchHIDMotionFactory>());
 #else
     sdl = SDL::Init();
     udp = CemuhookUDP::Init();
@@ -83,6 +85,7 @@ void Shutdown() {
 #if defined(__SWITCH__)
     Input::UnregisterFactory<Input::ButtonDevice>("switch_hid");
     Input::UnregisterFactory<Input::AnalogDevice>("switch_hid_analog");
+    Input::UnregisterFactory<Input::MotionDevice>("switch_hid_motion");
     SwitchHID::Shutdown();
 #else
     sdl.reset();

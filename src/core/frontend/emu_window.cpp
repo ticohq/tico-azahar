@@ -186,6 +186,10 @@ bool EmuWindow::TouchPressed(unsigned framebuffer_x, unsigned framebuffer_y) {
         std::swap(touch_state->touch_x, touch_state->touch_y);
         touch_state->touch_x = 1.f - touch_state->touch_x;
     }
+    if (framebuffer_layout.is_flipped) {
+        touch_state->touch_x = 1.f - touch_state->touch_x;
+        touch_state->touch_y = 1.f - touch_state->touch_y;
+    }
 
     touch_state->touch_pressed = true;
     return true;
@@ -302,6 +306,9 @@ void EmuWindow::UpdateCurrentFramebufferLayout(u32 width, u32 height, bool is_po
 
     if (Settings::values.render_3d.GetValue() == Settings::StereoRenderOption::CardboardVR) {
         layout = Layout::GetCardboardSettings(layout);
+    }
+    if (Settings::values.screen_rotation_180.GetValue()) {
+        layout = Layout::rotate180Layout(layout);
     }
     layout.render_3d_mode = stereo_option;
     NotifyFramebufferLayoutChanged(layout);

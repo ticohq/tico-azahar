@@ -30,4 +30,12 @@ void ApplyConfig();
 std::string GetLoadedConfigPath();
 std::size_t GetLoadedOptionCount();
 
+// Optional emulated 3DS profile name from tico config. Empty means leave the
+// current CFG savedata username untouched.
+std::string GetConfiguredUsername();
+
+// Optional emulated 3DS system language from tico config. Empty means leave the
+// current CFG savedata language untouched.
+std::string GetConfiguredSystemLanguage();
+
 } // namespace SwitchFrontend::TicoConfig
