@@ -707,7 +707,7 @@ void ConfigureSettings() {
     };
     profile.analogs[Settings::NativeAnalog::CirclePad] = MakeAnalog(0);
     profile.analogs[Settings::NativeAnalog::CStick]    = MakeAnalog(1);
-    profile.motion_device = "engine:switch_hid_motion";
+    profile.motion_device = "engine:switch_hid_motion,sensitivity:1.25";
     profile.touch_device = "engine:emu_window";
     profile.controller_touch_device.clear();
     profile.use_touchpad = false;

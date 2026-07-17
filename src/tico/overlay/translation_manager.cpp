@@ -14,8 +14,7 @@
 namespace SwitchFrontend::OverlayTranslation {
 namespace {
 
-constexpr std::array<const char*, 4> kGeneralConfigPaths = {{
-    "sdmc:/tiicu/config/general.jsonc",
+constexpr std::array<const char*, 3> kGeneralConfigPaths = {{
     "sdmc:/tico/config/general.jsonc",
     "sdmc:/tico/config/general.json",
     "romfs:/config/general.jsonc",

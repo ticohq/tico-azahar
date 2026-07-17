@@ -29,6 +29,14 @@ struct QuickMenuItem {
     const char* fallback;
 };
 
+struct DisplayLayoutChoice {
+    Settings::LayoutOption layout;
+    Settings::SmallScreenPosition small_position;
+    const char* config_value;
+    const char* label_key;
+    const char* fallback;
+};
+
 constexpr std::array<QuickMenuItem, 4> kQuickMenuItems = {{
     {"emulator_save_state", "Save State"},
     {"emulator_load_state", "Load State"},
@@ -36,7 +44,7 @@ constexpr std::array<QuickMenuItem, 4> kQuickMenuItems = {{
     {"emulator_exit_game", "Exit Game"},
 }};
 constexpr int kOverlaySlotCount = 4;
-constexpr int kSettingsItemCount = 3;
+constexpr int kSettingsItemCount = 4;
 constexpr int kToastSlotCount = 4;
 constexpr float kMenuWidth = 480.0f;
 
@@ -57,12 +65,21 @@ enum class DisplaySize {
     Original,
 };
 
-constexpr std::array<Settings::LayoutOption, 5> kDisplayLayoutModes = {{
-    Settings::LayoutOption::Default,
-    Settings::LayoutOption::SingleScreen,
-    Settings::LayoutOption::LargeScreen,
-    Settings::LayoutOption::SideScreen,
-    Settings::LayoutOption::HybridScreen,
+constexpr std::array<DisplayLayoutChoice, 7> kDisplayLayoutModes = {{
+    {Settings::LayoutOption::Default, Settings::SmallScreenPosition::BottomRight, "default",
+     "emulator_default", "Default"},
+    {Settings::LayoutOption::SingleScreen, Settings::SmallScreenPosition::BottomRight, "single",
+     "emulator_single_screen", "Single Screen"},
+    {Settings::LayoutOption::LargeScreen, Settings::SmallScreenPosition::BottomRight, "large",
+     "emulator_large_screen", "Large Screen"},
+    {Settings::LayoutOption::LargeScreen, Settings::SmallScreenPosition::BottomLeft,
+     "large_inverted", "emulator_large_screen_inverted", "Large Screen Inverted"},
+    {Settings::LayoutOption::SideScreen, Settings::SmallScreenPosition::BottomRight, "side",
+     "emulator_side_screen", "Side Screen"},
+    {Settings::LayoutOption::HybridScreen, Settings::SmallScreenPosition::BottomRight, "hybrid",
+     "emulator_hybrid_screen", "Hybrid Screen"},
+    {Settings::LayoutOption::HybridScreen, Settings::SmallScreenPosition::BottomLeft,
+     "hybrid_inverted", "emulator_hybrid_screen_inverted", "Hybrid Screen Inverted"},
 }};
 
 int s_selected = 0;
@@ -219,19 +236,50 @@ const char* ToConfigValue(DisplaySize size) {
     }
 }
 
-const char* ToConfigValue(Settings::LayoutOption layout) {
-    switch (layout) {
-    case Settings::LayoutOption::SingleScreen:
-        return "single";
-    case Settings::LayoutOption::LargeScreen:
-        return "large";
-    case Settings::LayoutOption::SideScreen:
-        return "side";
-    case Settings::LayoutOption::HybridScreen:
-        return "hybrid";
-    case Settings::LayoutOption::Default:
+bool IsLeftScreenPosition(Settings::SmallScreenPosition position) {
+    return position == Settings::SmallScreenPosition::TopLeft ||
+           position == Settings::SmallScreenPosition::MiddleLeft ||
+           position == Settings::SmallScreenPosition::BottomLeft;
+}
+
+const DisplayLayoutChoice& GetCurrentDisplayLayoutChoice() {
+    const Settings::LayoutOption layout = Settings::values.layout_option.GetValue();
+    const Settings::SmallScreenPosition small_position =
+        Settings::values.small_screen_position.GetValue();
+    for (const DisplayLayoutChoice& choice : kDisplayLayoutModes) {
+        if (choice.layout != layout) {
+            continue;
+        }
+        if ((layout == Settings::LayoutOption::LargeScreen ||
+             layout == Settings::LayoutOption::HybridScreen) &&
+            IsLeftScreenPosition(choice.small_position) != IsLeftScreenPosition(small_position)) {
+            continue;
+        }
+        return choice;
+    }
+    return kDisplayLayoutModes.front();
+}
+
+const char* ToConfigValue(Settings::SmallScreenPosition position) {
+    switch (position) {
+    case Settings::SmallScreenPosition::TopRight:
+        return "top_right";
+    case Settings::SmallScreenPosition::MiddleRight:
+        return "middle_right";
+    case Settings::SmallScreenPosition::BottomRight:
+        return "bottom_right";
+    case Settings::SmallScreenPosition::TopLeft:
+        return "top_left";
+    case Settings::SmallScreenPosition::MiddleLeft:
+        return "middle_left";
+    case Settings::SmallScreenPosition::BottomLeft:
+        return "bottom_left";
+    case Settings::SmallScreenPosition::AboveLarge:
+        return "above_large";
+    case Settings::SmallScreenPosition::BelowLarge:
+        return "below_large";
     default:
-        return "default";
+        return "bottom_right";
     }
 }
 
@@ -271,8 +319,12 @@ void SaveDisplaySettings() {
     TicoConfig::SetConfigValue("display_orientation", orientation);
     TicoConfig::SetConfigValue("display_rotation", inverted ? "180" : "0");
     TicoConfig::SetConfigValue("screen_rotation_180", inverted ? "true" : "false");
-    TicoConfig::SetConfigValue("layout",
-                               ToConfigValue(Settings::values.layout_option.GetValue()));
+    const DisplayLayoutChoice& layout_choice = GetCurrentDisplayLayoutChoice();
+    TicoConfig::SetConfigValue("layout", layout_choice.config_value);
+    TicoConfig::SetConfigValue("small_screen_position",
+                               ToConfigValue(Settings::values.small_screen_position.GetValue()));
+    TicoConfig::SetConfigValue("swap_screens",
+                               Settings::values.swap_screen.GetValue() ? "true" : "false");
     TicoConfig::SaveConfig();
 }
 
@@ -288,19 +340,8 @@ std::string GetOrientationValueLabel() {
 }
 
 std::string GetLayoutValueLabel() {
-    switch (Settings::values.layout_option.GetValue()) {
-    case Settings::LayoutOption::SingleScreen:
-        return TrOr("emulator_single_screen", "Single Screen");
-    case Settings::LayoutOption::LargeScreen:
-        return TrOr("emulator_large_screen", "Large Screen");
-    case Settings::LayoutOption::SideScreen:
-        return TrOr("emulator_side_screen", "Side Screen");
-    case Settings::LayoutOption::HybridScreen:
-        return TrOr("emulator_hybrid_screen", "Hybrid Screen");
-    case Settings::LayoutOption::Default:
-    default:
-        return TrOr("emulator_default", "Default");
-    }
+    const DisplayLayoutChoice& choice = GetCurrentDisplayLayoutChoice();
+    return TrOr(choice.label_key, choice.fallback);
 }
 
 std::string GetViewportValueLabel() {
@@ -314,6 +355,11 @@ std::string GetViewportValueLabel() {
     default:
         return TrOr("emulator_fill", "Fill");
     }
+}
+
+std::string GetSwapScreensValueLabel() {
+    return Settings::values.swap_screen.GetValue() ? TrOr("emulator_on", "On")
+                                                   : TrOr("emulator_off", "Off");
 }
 
 void ApplyDisplaySize() {
@@ -349,9 +395,10 @@ void AdvanceSettingsValue(int direction) {
         Settings::values.screen_rotation_180.SetValue(index == 2 || index == 3);
         SaveDisplaySettings();
     } else if (s_settings_selected == 1) {
-        const Settings::LayoutOption current = Settings::values.layout_option.GetValue();
-        const auto* found =
-            std::find(kDisplayLayoutModes.begin(), kDisplayLayoutModes.end(), current);
+        const DisplayLayoutChoice& current = GetCurrentDisplayLayoutChoice();
+        const auto* found = std::find_if(
+            kDisplayLayoutModes.begin(), kDisplayLayoutModes.end(),
+            [&current](const DisplayLayoutChoice& choice) { return choice.config_value == current.config_value; });
         int index = found == kDisplayLayoutModes.end()
                         ? 0
                         : static_cast<int>(found - kDisplayLayoutModes.begin());
@@ -361,7 +408,12 @@ void AdvanceSettingsValue(int direction) {
         } else if (index >= static_cast<int>(kDisplayLayoutModes.size())) {
             index = 0;
         }
-        Settings::values.layout_option.SetValue(kDisplayLayoutModes[static_cast<std::size_t>(index)]);
+        const DisplayLayoutChoice& next = kDisplayLayoutModes[static_cast<std::size_t>(index)];
+        Settings::values.layout_option.SetValue(next.layout);
+        Settings::values.small_screen_position.SetValue(next.small_position);
+        SaveDisplaySettings();
+    } else if (s_settings_selected == 2) {
+        Settings::values.swap_screen.SetValue(!Settings::values.swap_screen.GetValue());
         SaveDisplaySettings();
     } else {
         int size = static_cast<int>(s_display_size) + direction;
@@ -489,6 +541,10 @@ void RenderMenu(ImDrawList* dl, ImVec2 display_size, float ease) {
                 value = GetLayoutValueLabel();
                 break;
             case 2:
+                label = TrOr("emulator_swap_screens", "Swap Screens");
+                value = GetSwapScreensValueLabel();
+                break;
+            case 3:
                 label = TrOr("emulator_display_size", "Display Size");
                 value = GetViewportValueLabel();
                 break;

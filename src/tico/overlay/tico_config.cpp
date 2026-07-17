@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <sys/stat.h>
 
 #include <json.hpp>
 
@@ -25,8 +26,7 @@ namespace {
 
 using OptionMap = std::map<std::string, std::string, std::less<>>;
 
-constexpr std::array<const char*, 5> kConfigPaths = {{
-    "sdmc:/tiicu/config/cores/azahar.jsonc",
+constexpr std::array<const char*, 4> kConfigPaths = {{
     "sdmc:/tico/config/cores/azahar.jsonc",
     "sdmc:/tico/config/cores/azahar.json",
     "romfs:/config/azahar.jsonc",
@@ -34,6 +34,12 @@ constexpr std::array<const char*, 5> kConfigPaths = {{
 }};
 
 constexpr const char* kDefaultWritableConfigPath = "sdmc:/tico/config/cores/azahar.jsonc";
+
+void EnsureWritableConfigDirectory() {
+    mkdir("sdmc:/tico", 0777);
+    mkdir("sdmc:/tico/config", 0777);
+    mkdir("sdmc:/tico/config/cores", 0777);
+}
 
 // Strips // line and /* */ block comments so a .jsonc file parses as plain JSON.
 std::string StripJsonComments(std::string_view input) {
@@ -301,16 +307,20 @@ public:
         }
         const std::string serialized = root.dump(2);
 
-        const char* target =
-            loaded_path.empty() || loaded_path.rfind("sdmc:/", 0) != 0 ? kDefaultWritableConfigPath
-                                                                       : loaded_path.c_str();
+        EnsureWritableConfigDirectory();
+
+        const char* target = kDefaultWritableConfigPath;
         std::FILE* fp = std::fopen(target, "wb");
         if (!fp) {
             LOG_ERROR(Frontend, "failed to open tico config for write: {}", target);
             return false;
         }
-        std::fwrite(serialized.data(), 1, serialized.size(), fp);
+        const std::size_t written = std::fwrite(serialized.data(), 1, serialized.size(), fp);
         std::fclose(fp);
+        if (written != serialized.size()) {
+            LOG_ERROR(Frontend, "failed to write full tico config: {}", target);
+            return false;
+        }
         loaded_path = target;
         return true;
     }
@@ -430,6 +440,9 @@ public:
             v) {
             ApplyLayout(*v);
         }
+        if (const auto v = GetOptional("small_screen_position"); v) {
+            ApplySmallScreenPosition(*v);
+        }
         const auto orientation = GetFirstOptional({"display_orientation", "orientation",
                                                    "upright_screen"});
         if (orientation) {
@@ -519,12 +532,51 @@ private:
             layout = L::SingleScreen;
         } else if (lower == "large" || lower == "large_screen" || value == "LargeScreen") {
             layout = L::LargeScreen;
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::BottomRight);
+        } else if (lower == "large_inverted" || lower == "large_screen_inverted") {
+            layout = L::LargeScreen;
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::BottomLeft);
         } else if (lower == "side" || lower == "side_by_side" || value == "SideScreen") {
             layout = L::SideScreen;
         } else if (lower == "hybrid" || lower == "hybrid_screen" || value == "HybridScreen") {
             layout = L::HybridScreen;
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::BottomRight);
+        } else if (lower == "hybrid_inverted" || lower == "hybrid_screen_inverted") {
+            layout = L::HybridScreen;
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::BottomLeft);
         }
         Settings::values.layout_option.SetValue(layout);
+    }
+
+    static void ApplySmallScreenPosition(std::string_view value) {
+        const std::string lower = LowerCopy(value);
+        if (lower == "top_right" || lower == "topright") {
+            Settings::values.small_screen_position.SetValue(Settings::SmallScreenPosition::TopRight);
+        } else if (lower == "middle_right" || lower == "middleright" || lower == "right") {
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::MiddleRight);
+        } else if (lower == "bottom_right" || lower == "bottomright") {
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::BottomRight);
+        } else if (lower == "top_left" || lower == "topleft") {
+            Settings::values.small_screen_position.SetValue(Settings::SmallScreenPosition::TopLeft);
+        } else if (lower == "middle_left" || lower == "middleleft" || lower == "left") {
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::MiddleLeft);
+        } else if (lower == "bottom_left" || lower == "bottomleft") {
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::BottomLeft);
+        } else if (lower == "above_large" || lower == "above") {
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::AboveLarge);
+        } else if (lower == "below_large" || lower == "below") {
+            Settings::values.small_screen_position.SetValue(
+                Settings::SmallScreenPosition::BelowLarge);
+        }
     }
 
     static void ApplyOrientation(std::string_view value) {

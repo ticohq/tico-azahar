@@ -35,13 +35,10 @@ constexpr std::array<const char*, 3> kFontPaths = {{
     "sdmc:/tico/fonts/font.ttf",
     "sdmc:/tico/system/3ds/fonts/font.ttf",
 }};
-constexpr std::array<const char*, 9> kAvatarPaths = {{
+constexpr std::array<const char*, 6> kAvatarPaths = {{
     "sdmc:/tico/assets/avatar.jpg",
     "sdmc:/tico/assets/avatar.jpeg",
     "sdmc:/tico/assets/avatar.png",
-    "sdmc:/tiicu/assets/avatar.jpg",
-    "sdmc:/tiicu/assets/avatar.jpeg",
-    "sdmc:/tiicu/assets/avatar.png",
     "romfs:/assets/avatar.jpg",
     "romfs:/assets/avatar.jpeg",
     "romfs:/assets/avatar.png",

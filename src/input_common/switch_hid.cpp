@@ -17,36 +17,48 @@ namespace InputCommon {
 namespace SwitchHID {
 
 static PadState g_pad{};
-static std::array<HidSixAxisSensorHandle, 4> g_sixaxis_handles{};
-static std::array<bool, 4> g_sixaxis_started{};
+static std::array<HidSixAxisSensorHandle, 6> g_sixaxis_handles{};
+static std::array<bool, 6> g_sixaxis_started{};
 
 constexpr std::size_t kSixAxisHandheld = 0;
 constexpr std::size_t kSixAxisFullKey = 1;
 constexpr std::size_t kSixAxisJoyDualLeft = 2;
 constexpr std::size_t kSixAxisJoyDualRight = 3;
+constexpr std::size_t kSixAxisJoyLeft = 4;
+constexpr std::size_t kSixAxisJoyRight = 5;
+constexpr float kDefaultMotionSensitivity = 1.25f;
 
-void StartSixAxisSensor(std::size_t index) {
+bool StartSixAxisSensor(std::size_t index) {
     const LibnxResult rc = hidStartSixAxisSensor(g_sixaxis_handles[index]);
     g_sixaxis_started[index] = rc == 0;
+    return g_sixaxis_started[index];
+}
+
+bool EnsureSingleSixAxisSensor(std::size_t index, HidNpadIdType id, HidNpadStyleTag style) {
+    if (g_sixaxis_started[index]) {
+        return true;
+    }
+    if (hidGetSixAxisSensorHandles(&g_sixaxis_handles[index], 1, id, style) != 0) {
+        return false;
+    }
+    return StartSixAxisSensor(index);
+}
+
+bool EnsureJoyDualSixAxisSensors() {
+    if (g_sixaxis_started[kSixAxisJoyDualLeft] || g_sixaxis_started[kSixAxisJoyDualRight]) {
+        return true;
+    }
+    if (hidGetSixAxisSensorHandles(&g_sixaxis_handles[kSixAxisJoyDualLeft], 2, HidNpadIdType_No1,
+                                   HidNpadStyleTag_NpadJoyDual) != 0) {
+        return false;
+    }
+    const bool left_started = StartSixAxisSensor(kSixAxisJoyDualLeft);
+    const bool right_started = StartSixAxisSensor(kSixAxisJoyDualRight);
+    return left_started || right_started;
 }
 
 void Init() {
     padInitializeDefault(&g_pad);
-
-    if (hidGetSixAxisSensorHandles(&g_sixaxis_handles[kSixAxisHandheld], 1,
-                                   HidNpadIdType_Handheld,
-                                   HidNpadStyleTag_NpadHandheld) == 0) {
-        StartSixAxisSensor(kSixAxisHandheld);
-    }
-    if (hidGetSixAxisSensorHandles(&g_sixaxis_handles[kSixAxisFullKey], 1, HidNpadIdType_No1,
-                                   HidNpadStyleTag_NpadFullKey) == 0) {
-        StartSixAxisSensor(kSixAxisFullKey);
-    }
-    if (hidGetSixAxisSensorHandles(&g_sixaxis_handles[kSixAxisJoyDualLeft], 2,
-                                   HidNpadIdType_No1, HidNpadStyleTag_NpadJoyDual) == 0) {
-        StartSixAxisSensor(kSixAxisJoyDualLeft);
-        StartSixAxisSensor(kSixAxisJoyDualRight);
-    }
 }
 
 void Update() {
@@ -140,25 +152,64 @@ private:
     float sensitivity;
 
     static bool ReadSixAxisState(HidSixAxisSensorState& state) {
+        padUpdate(&g_pad);
         const u64 style_set = padGetStyleSet(&g_pad);
-        if ((style_set & HidNpadStyleTag_NpadHandheld) && g_sixaxis_started[kSixAxisHandheld]) {
-            return hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisHandheld], &state, 1) > 0;
+        if ((style_set & HidNpadStyleTag_NpadHandheld) &&
+            EnsureSingleSixAxisSensor(kSixAxisHandheld, HidNpadIdType_Handheld,
+                                      HidNpadStyleTag_NpadHandheld)) {
+            if (hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisHandheld], &state, 1) > 0) {
+                return true;
+            }
+            g_sixaxis_started[kSixAxisHandheld] = false;
+            return false;
         }
-        if ((style_set & HidNpadStyleTag_NpadFullKey) && g_sixaxis_started[kSixAxisFullKey]) {
-            return hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisFullKey], &state, 1) > 0;
+        if ((style_set & HidNpadStyleTag_NpadFullKey) &&
+            EnsureSingleSixAxisSensor(kSixAxisFullKey, HidNpadIdType_No1,
+                                      HidNpadStyleTag_NpadFullKey)) {
+            if (hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisFullKey], &state, 1) > 0) {
+                return true;
+            }
+            g_sixaxis_started[kSixAxisFullKey] = false;
+            return false;
         }
-        if (style_set & HidNpadStyleTag_NpadJoyDual) {
+        if ((style_set & HidNpadStyleTag_NpadJoyDual) && EnsureJoyDualSixAxisSensors()) {
             const u64 attributes = padGetAttributes(&g_pad);
             if ((attributes & HidNpadAttribute_IsLeftConnected) &&
                 g_sixaxis_started[kSixAxisJoyDualLeft]) {
-                return hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisJoyDualLeft], &state,
-                                                 1) > 0;
+                if (hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisJoyDualLeft], &state, 1) >
+                    0) {
+                    return true;
+                }
+                g_sixaxis_started[kSixAxisJoyDualLeft] = false;
+                return false;
             }
             if ((attributes & HidNpadAttribute_IsRightConnected) &&
                 g_sixaxis_started[kSixAxisJoyDualRight]) {
-                return hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisJoyDualRight], &state,
-                                                 1) > 0;
+                if (hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisJoyDualRight], &state, 1) >
+                    0) {
+                    return true;
+                }
+                g_sixaxis_started[kSixAxisJoyDualRight] = false;
+                return false;
             }
+        }
+        if ((style_set & HidNpadStyleTag_NpadJoyLeft) &&
+            EnsureSingleSixAxisSensor(kSixAxisJoyLeft, HidNpadIdType_No1,
+                                      HidNpadStyleTag_NpadJoyLeft)) {
+            if (hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisJoyLeft], &state, 1) > 0) {
+                return true;
+            }
+            g_sixaxis_started[kSixAxisJoyLeft] = false;
+            return false;
+        }
+        if ((style_set & HidNpadStyleTag_NpadJoyRight) &&
+            EnsureSingleSixAxisSensor(kSixAxisJoyRight, HidNpadIdType_No1,
+                                      HidNpadStyleTag_NpadJoyRight)) {
+            if (hidGetSixAxisSensorStates(g_sixaxis_handles[kSixAxisJoyRight], &state, 1) > 0) {
+                return true;
+            }
+            g_sixaxis_started[kSixAxisJoyRight] = false;
+            return false;
         }
         return false;
     }
@@ -166,7 +217,7 @@ private:
 
 std::unique_ptr<Input::MotionDevice> SwitchHIDMotionFactory::Create(
     const Common::ParamPackage& params) {
-    const float sensitivity = params.Get("sensitivity", 1.0f);
+    const float sensitivity = params.Get("sensitivity", kDefaultMotionSensitivity);
     return std::make_unique<SwitchHIDMotion>(sensitivity);
 }
 

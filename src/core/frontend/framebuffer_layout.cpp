@@ -309,8 +309,16 @@ FramebufferLayout HybridScreenLayout(u32 width, u32 height, bool swapped, bool u
 
     // use Large Screen layout with these specific ratios to get two of the pieces
     const float scale_factor = swapped ? 2.25 : 1.8;
-    const Settings::SmallScreenPosition pos = swapped ? Settings::SmallScreenPosition::TopRight
-                                                      : Settings::SmallScreenPosition::BottomRight;
+    const Settings::SmallScreenPosition configured_pos =
+        Settings::values.small_screen_position.GetValue();
+    const bool inverted = configured_pos == Settings::SmallScreenPosition::TopLeft ||
+                          configured_pos == Settings::SmallScreenPosition::MiddleLeft ||
+                          configured_pos == Settings::SmallScreenPosition::BottomLeft;
+    const Settings::SmallScreenPosition pos =
+        swapped ? (inverted ? Settings::SmallScreenPosition::TopLeft
+                            : Settings::SmallScreenPosition::TopRight)
+                : (inverted ? Settings::SmallScreenPosition::BottomLeft
+                            : Settings::SmallScreenPosition::BottomRight);
     // always pass false as the upright value here, as it is being handled here not there
     FramebufferLayout res = LargeFrameLayout(width, height, swapped, false, scale_factor, pos);
     const Common::Rectangle<u32> main = swapped ? res.bottom_screen : res.top_screen;

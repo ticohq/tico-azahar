@@ -24,7 +24,9 @@
 #include "video_core/host_shaders/vulkan_cursor_frag.h"
 #include "video_core/host_shaders/vulkan_cursor_vert.h"
 
+#include <cstddef>
 #include <cstring>
+#include <vector>
 
 #include <vk_mem_alloc.h>
 #if defined(__APPLE__) && !defined(HAVE_LIBRETRO)
@@ -46,6 +48,22 @@ struct ScreenRectVertex {
 
     Common::Vec2f position;
     Common::Vec2f tex_coord;
+};
+
+struct CursorVertex {
+    float x;
+    float y;
+    float r;
+    float g;
+    float b;
+    float a;
+};
+
+struct CursorSpan {
+    float x;
+    float y;
+    float width;
+    float height;
 };
 
 constexpr u32 VERTEX_BUFFER_SIZE = sizeof(ScreenRectVertex) * 8192;
@@ -685,26 +703,34 @@ void RendererVulkan::BuildPipelines() {
         present_pipelines[i] = pipeline;
     }
 
-    // Build cursor pipeline (simple position-only, inverted color blending)
+    // Build cursor pipeline
     {
         const vk::VertexInputBindingDescription cursor_binding = {
             .binding = 0,
-            .stride = sizeof(float) * 2,
+            .stride = sizeof(CursorVertex),
             .inputRate = vk::VertexInputRate::eVertex,
         };
 
-        const vk::VertexInputAttributeDescription cursor_attribute = {
-            .location = 0,
-            .binding = 0,
-            .format = vk::Format::eR32G32Sfloat,
-            .offset = 0,
+        const std::array cursor_attributes = {
+            vk::VertexInputAttributeDescription{
+                .location = 0,
+                .binding = 0,
+                .format = vk::Format::eR32G32Sfloat,
+                .offset = offsetof(CursorVertex, x),
+            },
+            vk::VertexInputAttributeDescription{
+                .location = 1,
+                .binding = 0,
+                .format = vk::Format::eR32G32B32A32Sfloat,
+                .offset = offsetof(CursorVertex, r),
+            },
         };
 
         const vk::PipelineVertexInputStateCreateInfo cursor_vertex_input = {
             .vertexBindingDescriptionCount = 1,
             .pVertexBindingDescriptions = &cursor_binding,
-            .vertexAttributeDescriptionCount = 1,
-            .pVertexAttributeDescriptions = &cursor_attribute,
+            .vertexAttributeDescriptionCount = static_cast<u32>(cursor_attributes.size()),
+            .pVertexAttributeDescriptions = cursor_attributes.data(),
         };
 
         const vk::PipelineInputAssemblyStateCreateInfo cursor_input_assembly = {
@@ -728,11 +754,11 @@ void RendererVulkan::BuildPipelines() {
 
         const vk::PipelineColorBlendAttachmentState cursor_blend_attachment = {
             .blendEnable = true,
-            .srcColorBlendFactor = vk::BlendFactor::eOneMinusDstColor,
-            .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcColor,
+            .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
             .colorBlendOp = vk::BlendOp::eAdd,
             .srcAlphaBlendFactor = vk::BlendFactor::eOne,
-            .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+            .dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
             .alphaBlendOp = vk::BlendOp::eAdd,
             .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
@@ -1302,57 +1328,93 @@ void RendererVulkan::DrawCursor(const Layout::FramebufferLayout& layout) {
         return;
     }
 
+    static constexpr std::array<CursorSpan, 23> black_spans = {{
+        {5, 0, 2, 1},  {4, 1, 4, 1},  {4, 2, 4, 1},   {4, 3, 4, 1},
+        {4, 4, 4, 1},  {4, 5, 6, 1},  {4, 6, 9, 1},   {4, 7, 11, 1},
+        {4, 8, 12, 1}, {0, 9, 3, 1},  {4, 9, 13, 1},  {0, 10, 17, 1},
+        {0, 11, 17, 1}, {1, 12, 16, 1}, {2, 13, 15, 1}, {2, 14, 15, 1},
+        {3, 15, 14, 1}, {3, 16, 13, 1}, {4, 17, 12, 1}, {4, 18, 12, 1},
+        {5, 19, 10, 1}, {5, 20, 10, 1}, {5, 21, 10, 1},
+    }};
+    static constexpr std::array<CursorSpan, 32> white_spans = {{
+        {5, 1, 2, 1},  {5, 2, 2, 1},  {5, 3, 2, 1},   {5, 4, 2, 1},
+        {5, 5, 2, 1},  {5, 6, 2, 1},  {8, 6, 2, 1},   {5, 7, 2, 1},
+        {8, 7, 2, 1},  {11, 7, 2, 1}, {5, 8, 2, 1},   {8, 8, 2, 1},
+        {11, 8, 2, 1}, {14, 8, 1, 1}, {5, 9, 2, 1},   {8, 9, 2, 1},
+        {11, 9, 2, 1}, {14, 9, 2, 1}, {1, 10, 2, 1},  {5, 10, 8, 1},
+        {14, 10, 2, 1}, {1, 11, 3, 1}, {5, 11, 11, 1}, {2, 12, 14, 1},
+        {3, 13, 13, 1}, {3, 14, 13, 1}, {4, 15, 12, 1}, {4, 16, 11, 1},
+        {5, 17, 10, 1}, {5, 18, 10, 1}, {6, 19, 8, 1}, {6, 20, 8, 1},
+    }};
+
     const float buf_w = static_cast<float>(layout.width);
     const float buf_h = static_cast<float>(layout.height);
 
-    // Convert from bottom-screen-local to layout-absolute, then to NDC
+    // Convert from bottom-screen-local to layout-absolute. The hand cursor is based on
+    // src/tico/assets/mouse.svg, with the fingertip aligned to the touch coordinate.
     const float abs_x = layout.bottom_screen.left + cursor.projected_x;
     const float abs_y = layout.bottom_screen.top + cursor.projected_y;
-    const float cx = (abs_x / buf_w) * 2.0f - 1.0f;
-    const float cy = (abs_y / buf_h) * 2.0f - 1.0f;
-    const float ratio = static_cast<float>(layout.bottom_screen.GetHeight()) / 30.0f;
-    const float rw = ratio / buf_w;
-    const float rh = ratio / buf_h;
 
-    // Bottom screen bounds in NDC
-    const float bl = (layout.bottom_screen.left / buf_w) * 2.0f - 1.0f;
-    const float bt = (layout.bottom_screen.top / buf_h) * 2.0f - 1.0f;
-    const float br = (layout.bottom_screen.right / buf_w) * 2.0f - 1.0f;
-    const float bb = (layout.bottom_screen.bottom / buf_h) * 2.0f - 1.0f;
+    constexpr float tip_x = 6.0f;
+    constexpr float tip_y = 0.0f;
+    const float pixel_size = static_cast<float>(layout.bottom_screen.GetHeight()) / 180.0f;
+    const float screen_left = static_cast<float>(layout.bottom_screen.left);
+    const float screen_top = static_cast<float>(layout.bottom_screen.top);
+    const float screen_right = static_cast<float>(layout.bottom_screen.right);
+    const float screen_bottom = static_cast<float>(layout.bottom_screen.bottom);
 
-    // Crosshair geometry clamped to bottom screen bounds
-    const float vl = std::fmax(cx - rw / 5.0f, bl);
-    const float vr = std::fmin(cx + rw / 5.0f, br);
-    const float vt = std::fmax(cy - rh, bt);
-    const float vb = std::fmin(cy + rh, bb);
+    std::vector<CursorVertex> vertices;
+    vertices.reserve((black_spans.size() + white_spans.size()) * 6);
 
-    const float hl = std::fmax(cx - rw, bl);
-    const float hr = std::fmin(cx + rw, br);
-    const float ht = std::fmax(cy - rh / 5.0f, bt);
-    const float hb = std::fmin(cy + rh / 5.0f, bb);
+    const auto to_ndc_x = [buf_w](float x) { return (x / buf_w) * 2.0f - 1.0f; };
+    const auto to_ndc_y = [buf_h](float y) { return (y / buf_h) * 2.0f - 1.0f; };
+    const auto append_span = [&](const CursorSpan& span, float r, float g, float b, float a) {
+        float left = abs_x + (span.x - tip_x) * pixel_size;
+        float top = abs_y + (span.y - tip_y) * pixel_size;
+        float right = left + span.width * pixel_size;
+        float bottom = top + span.height * pixel_size;
 
-    // 12 vertices = 4 triangles (2 for vertical bar, 2 for horizontal bar)
-    // clang-format off
-    const float vertices[] = {
-        // Vertical bar
-        vl, vt,  vr, vt,  vr, vb,
-        vl, vt,  vr, vb,  vl, vb,
-        // Horizontal bar
-        hl, ht,  hr, ht,  hr, hb,
-        hl, ht,  hr, hb,  hl, hb,
+        left = std::fmax(left, screen_left);
+        top = std::fmax(top, screen_top);
+        right = std::fmin(right, screen_right);
+        bottom = std::fmin(bottom, screen_bottom);
+        if (left >= right || top >= bottom) {
+            return;
+        }
+
+        const float l = to_ndc_x(left);
+        const float t = to_ndc_y(top);
+        const float rr = to_ndc_x(right);
+        const float bb = to_ndc_y(bottom);
+
+        vertices.push_back({l, t, r, g, b, a});
+        vertices.push_back({rr, t, r, g, b, a});
+        vertices.push_back({rr, bb, r, g, b, a});
+        vertices.push_back({l, t, r, g, b, a});
+        vertices.push_back({rr, bb, r, g, b, a});
+        vertices.push_back({l, bb, r, g, b, a});
     };
-    // clang-format on
 
-    const u64 size = sizeof(vertices);
+    for (const auto& span : black_spans) {
+        append_span(span, 0.0f, 0.0f, 0.0f, 0.95f);
+    }
+    for (const auto& span : white_spans) {
+        append_span(span, 1.0f, 1.0f, 1.0f, 0.95f);
+    }
+    if (vertices.empty()) {
+        return;
+    }
+
+    const u64 size = vertices.size() * sizeof(CursorVertex);
     auto [data, offset, invalidate] = vertex_buffer.Map(size, 16);
-    std::memcpy(data, vertices, size);
+    std::memcpy(data, vertices.data(), size);
     vertex_buffer.Commit(size);
 
-    scheduler.Record([this, offset = offset, pipeline = cursor_pipeline](vk::CommandBuffer cmdbuf) {
+    scheduler.Record([this, offset = offset, pipeline = cursor_pipeline,
+                      vertex_count = static_cast<u32>(vertices.size())](vk::CommandBuffer cmdbuf) {
         cmdbuf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-        cmdbuf.bindVertexBuffers(0, vertex_buffer.Handle(), {0});
-        const u32 first_vertex = static_cast<u32>(offset) / (sizeof(float) * 2);
-        cmdbuf.draw(12, 1, first_vertex, 0);
+        cmdbuf.bindVertexBuffers(0, vertex_buffer.Handle(), {offset});
+        cmdbuf.draw(vertex_count, 1, 0, 0);
     });
 }
 
