@@ -37,9 +37,10 @@ struct DisplayLayoutChoice {
     const char* fallback;
 };
 
-constexpr std::array<QuickMenuItem, 4> kQuickMenuItems = {{
+constexpr std::array<QuickMenuItem, 5> kQuickMenuItems = {{
     {"emulator_save_state", "Save State"},
     {"emulator_load_state", "Load State"},
+    {"emulator_cheats", "Cheats"},
     {"emulator_settings", "Settings"},
     {"emulator_exit_game", "Exit Game"},
 }};
@@ -56,6 +57,7 @@ enum class MenuScreen {
     QuickMenu,
     SaveStates,
     LoadStates,
+    Cheats,
     Settings,
 };
 
@@ -84,6 +86,7 @@ constexpr std::array<DisplayLayoutChoice, 7> kDisplayLayoutModes = {{
 
 int s_selected = 0;
 int s_slot_selected = 0;
+int s_cheat_selected = 0;
 int s_settings_selected = 0;
 std::string s_title;
 std::string s_nickname;
@@ -98,6 +101,9 @@ std::mutex s_toast_mutex;
 std::array<std::string, kToastSlotCount> s_toast_messages{};
 std::array<float, kToastSlotCount> s_toast_timers{};
 SlotOccupiedFn s_slot_occupied_cb;
+CheatListFn s_cheat_list_cb;
+CheatToggleFn s_cheat_toggle_cb;
+std::vector<CheatMenuEntry> s_cheat_entries;
 
 float EaseOutCubic(float t) {
     t = std::clamp(t, 0.0f, 1.0f);
@@ -131,6 +137,50 @@ void DrawSwitchButton(ImDrawList* dl, ImFont* font, float font_size, ImVec2 cent
                 symbol.data() + symbol.size());
 }
 
+std::string EllipsizeText(ImFont* font, float font_size, const std::string& text, float max_width) {
+    if (font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text.c_str()).x <= max_width) {
+        return text;
+    }
+
+    constexpr std::string_view suffix = "...";
+    std::string result = text;
+    while (!result.empty()) {
+        result.pop_back();
+        const std::string candidate = result + "...";
+        if (font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, candidate.c_str()).x <= max_width) {
+            return candidate;
+        }
+    }
+    return std::string(suffix);
+}
+
+void DrawCheckBox(ImDrawList* dl, ImVec2 center, float size, bool checked, float alpha) {
+    const float half = size * 0.5f;
+    const ImVec2 p0(center.x - half, center.y - half);
+    const ImVec2 p1(center.x + half, center.y + half);
+    const ImU32 border = IM_COL32(220, 220, 220, static_cast<int>(220.0f * alpha));
+    const ImU32 fill = IM_COL32(235, 235, 235, static_cast<int>(checked ? 220.0f * alpha : 0.0f));
+    dl->AddRect(p0, p1, border, 4.0f, 0, 2.0f);
+    if (!checked) {
+        return;
+    }
+
+    dl->AddRectFilled(ImVec2(p0.x + 3.0f, p0.y + 3.0f), ImVec2(p1.x - 3.0f, p1.y - 3.0f), fill,
+                      3.0f);
+    const ImU32 mark = IM_COL32(45, 45, 45, static_cast<int>(255.0f * alpha));
+    dl->PathLineTo(ImVec2(p0.x + (size * 0.25f), center.y));
+    dl->PathLineTo(ImVec2(p0.x + (size * 0.44f), p0.y + (size * 0.68f)));
+    dl->PathLineTo(ImVec2(p0.x + (size * 0.76f), p0.y + (size * 0.32f)));
+    dl->PathStroke(mark, 0, 2.5f);
+}
+
+void RefreshCheats() {
+    s_cheat_entries = s_cheat_list_cb ? s_cheat_list_cb() : std::vector<CheatMenuEntry>{};
+    if (s_cheat_selected >= static_cast<int>(s_cheat_entries.size())) {
+        s_cheat_selected = std::max(0, static_cast<int>(s_cheat_entries.size()) - 1);
+    }
+}
+
 std::string BuildTitle() {
     std::string title;
     switch (s_menu) {
@@ -139,6 +189,9 @@ std::string BuildTitle() {
         break;
     case MenuScreen::LoadStates:
         title = TrOr("emulator_load_state", "Load State");
+        break;
+    case MenuScreen::Cheats:
+        title = TrOr("emulator_cheats", "Cheats");
         break;
     case MenuScreen::Settings:
         title = TrOr("emulator_settings", "Settings");
@@ -583,6 +636,89 @@ void RenderMenu(ImDrawList* dl, ImVec2 display_size, float ease) {
         return;
     }
 
+    if (s_menu == MenuScreen::Cheats) {
+        const float scale = ImGui::GetIO().FontGlobalScale;
+        const float menu_width = kMenuWidth * 1.35f * scale;
+        const float item_height = 58.0f * scale;
+        const int item_count = std::max(1, static_cast<int>(s_cheat_entries.size()));
+        const int visible_count = std::min(item_count, 8);
+        const float content_height = static_cast<float>(visible_count) * item_height;
+        const ImVec2 menu_size(menu_width, content_height);
+        const float target_y = (display_size.y - menu_size.y) * 0.5f;
+        const float start_y = display_size.y + (100.0f * scale);
+        const float current_y = start_y + ((target_y - start_y) * ease);
+        const ImVec2 menu_pos((display_size.x - menu_size.x) * 0.5f, current_y);
+        const ImVec2 p0 = menu_pos;
+        const ImVec2 p1(menu_pos.x + menu_size.x, menu_pos.y + menu_size.y);
+        const float corner_radius = 16.0f * scale;
+
+        dl->AddRectFilled(p0, p1, IM_COL32(45, 45, 45, static_cast<int>(255.0f * ease)),
+                          corner_radius);
+
+        ImFont* font = ImGui::GetFont();
+        const float label_size = ImGui::GetFontSize() * 0.82f;
+        int first_visible = 0;
+        if (item_count > visible_count) {
+            first_visible =
+                std::clamp(s_cheat_selected - (visible_count / 2), 0, item_count - visible_count);
+        }
+
+        for (int row = 0; row < visible_count; ++row) {
+            const int i = first_visible + row;
+            const bool has_cheats = !s_cheat_entries.empty();
+            const bool selected = has_cheats && s_cheat_selected == i;
+            const float item_y = menu_pos.y + (static_cast<float>(row) * item_height);
+            const ImVec2 item_min(menu_pos.x, item_y);
+            const ImVec2 item_max(menu_pos.x + menu_size.x, item_y + item_height);
+
+            if (selected) {
+                ImDrawFlags corners = ImDrawFlags_None;
+                float item_radius = 0.0f;
+                if (row == 0) {
+                    corners = ImDrawFlags_RoundCornersTop;
+                    item_radius = corner_radius;
+                } else if (row == visible_count - 1) {
+                    corners = ImDrawFlags_RoundCornersBottom;
+                    item_radius = corner_radius;
+                }
+
+                dl->AddRectFilled(item_min, item_max,
+                                  IM_COL32(60, 60, 60, static_cast<int>(255.0f * ease)),
+                                  item_radius, corners);
+            }
+
+            const std::string label =
+                has_cheats ? s_cheat_entries[static_cast<std::size_t>(i)].name
+                           : TrOr("emulator_no_cheats", "No Cheats");
+            const bool enabled =
+                has_cheats && s_cheat_entries[static_cast<std::size_t>(i)].enabled;
+            const bool toggleable =
+                has_cheats && s_cheat_entries[static_cast<std::size_t>(i)].toggleable;
+            const ImU32 text_color =
+                selected ? IM_COL32(255, 255, 255, static_cast<int>(255.0f * ease))
+                         : IM_COL32(toggleable ? 200 : 150, toggleable ? 200 : 150,
+                                    toggleable ? 200 : 150, static_cast<int>(255.0f * ease));
+            const float text_x = item_min.x + (20.0f * scale);
+            const float checkbox_size = 22.0f * scale;
+            const float checkbox_x = item_max.x - (28.0f * scale);
+            const float max_text_width =
+                has_cheats ? (checkbox_x - text_x - (28.0f * scale)) : (menu_size.x - 40.0f * scale);
+            const std::string fitted_label = EllipsizeText(font, label_size, label, max_text_width);
+            const ImVec2 text_size =
+                font->CalcTextSizeA(label_size, FLT_MAX, 0.0f, fitted_label.c_str());
+            const float text_y = item_min.y + ((item_height - text_size.y) * 0.5f);
+            dl->AddText(font, label_size, ImVec2(text_x, text_y), text_color, fitted_label.c_str());
+
+            if (has_cheats) {
+                DrawCheckBox(dl, ImVec2(checkbox_x - (checkbox_size * 0.5f),
+                                        item_min.y + (item_height * 0.5f)),
+                             checkbox_size, enabled, ease);
+            }
+        }
+
+        return;
+    }
+
     const bool showing_slots = s_menu == MenuScreen::SaveStates || s_menu == MenuScreen::LoadStates;
     const float scale = ImGui::GetIO().FontGlobalScale;
     const float menu_width = kMenuWidth * scale;
@@ -654,6 +790,8 @@ void RenderHelpersBar(ImDrawList* dl, ImVec2 display_size, float ease) {
         accept = TrOr("emulator_save_state", "Save State");
     else if (s_menu == MenuScreen::LoadStates)
         accept = TrOr("emulator_load_state", "Load State");
+    else if (s_menu == MenuScreen::Cheats && !s_cheat_entries.empty())
+        accept = TrOr("emulator_toggle", "Toggle");
     else if (s_menu == MenuScreen::Settings)
         accept = TrOr("emulator_change", "Change");
 
@@ -917,12 +1055,15 @@ void SetVisible(bool visible) {
         s_anim_timer = 0.0f;
         s_selected = 0;
         s_slot_selected = 0;
+        s_cheat_selected = 0;
         s_settings_selected = 0;
         s_menu = MenuScreen::QuickMenu;
     } else if (!visible) {
         s_anim_timer = 0.0f;
         s_slot_selected = 0;
+        s_cheat_selected = 0;
         s_settings_selected = 0;
+        s_cheat_entries.clear();
         s_menu = MenuScreen::QuickMenu;
     }
 
@@ -943,6 +1084,13 @@ void SetAvatarTextureId(unsigned long long texture_id) {
 
 void SetSlotOccupiedCallback(SlotOccupiedFn callback) {
     s_slot_occupied_cb = std::move(callback);
+}
+
+void SetCheatCallbacks(CheatListFn list_callback, CheatToggleFn toggle_callback) {
+    s_cheat_list_cb = std::move(list_callback);
+    s_cheat_toggle_cb = std::move(toggle_callback);
+    s_cheat_entries.clear();
+    s_cheat_selected = 0;
 }
 
 void ShowToast(std::string message, ToastCorner corner) {
@@ -989,15 +1137,20 @@ Action Render(int display_w, int display_h) {
     const float ease = EaseOutCubic(s_anim_timer / kAnimDuration);
 
     const bool showing_slots = s_menu == MenuScreen::SaveStates || s_menu == MenuScreen::LoadStates;
+    const bool showing_cheats = s_menu == MenuScreen::Cheats;
     const bool showing_settings = s_menu == MenuScreen::Settings;
-    const int item_count =
-        showing_slots ? kOverlaySlotCount
-                      : (showing_settings ? kSettingsItemCount
-                                          : static_cast<int>(kQuickMenuItems.size()));
+    const int item_count = showing_slots
+                               ? kOverlaySlotCount
+                               : (showing_cheats
+                                      ? std::max(1, static_cast<int>(s_cheat_entries.size()))
+                                      : (showing_settings ? kSettingsItemCount
+                                                          : static_cast<int>(kQuickMenuItems.size())));
 
     if (nav.up) {
         if (showing_slots)
             s_slot_selected = (s_slot_selected - 1 + item_count) % item_count;
+        else if (showing_cheats && !s_cheat_entries.empty())
+            s_cheat_selected = (s_cheat_selected - 1 + item_count) % item_count;
         else if (showing_settings)
             s_settings_selected = (s_settings_selected - 1 + item_count) % item_count;
         else
@@ -1006,6 +1159,8 @@ Action Render(int display_w, int display_h) {
     if (nav.down) {
         if (showing_slots)
             s_slot_selected = (s_slot_selected + 1) % item_count;
+        else if (showing_cheats && !s_cheat_entries.empty())
+            s_cheat_selected = (s_cheat_selected + 1) % item_count;
         else if (showing_settings)
             s_settings_selected = (s_settings_selected + 1) % item_count;
         else
@@ -1020,9 +1175,10 @@ Action Render(int display_w, int display_h) {
 
     Action result = Action::None;
     if (nav.cancel) {
-        if (showing_slots || showing_settings) {
+        if (showing_slots || showing_cheats || showing_settings) {
             s_menu = MenuScreen::QuickMenu;
             s_slot_selected = 0;
+            s_cheat_selected = 0;
             s_settings_selected = 0;
         } else {
             result = Action::Resume;
@@ -1042,6 +1198,14 @@ Action Render(int display_w, int display_h) {
                                                       : MakeLoadActionForSlot(s_slot_selected);
             s_menu = MenuScreen::QuickMenu;
             s_slot_selected = 0;
+        } else if (showing_cheats) {
+            if (!s_cheat_entries.empty() && s_cheat_toggle_cb) {
+                const CheatMenuEntry& entry =
+                    s_cheat_entries[static_cast<std::size_t>(s_cheat_selected)];
+                if (entry.toggleable && s_cheat_toggle_cb(entry.source_index)) {
+                    RefreshCheats();
+                }
+            }
         } else if (showing_settings) {
             AdvanceSettingsValue(1);
         } else {
@@ -1057,10 +1221,15 @@ Action Render(int display_w, int display_h) {
                 s_slot_selected = 0;
                 break;
             case 2:
+                RefreshCheats();
+                s_menu = MenuScreen::Cheats;
+                s_cheat_selected = 0;
+                break;
+            case 3:
                 s_menu = MenuScreen::Settings;
                 s_settings_selected = 0;
                 break;
-            case 3:
+            case 4:
                 result = Action::Exit;
                 break;
             default:

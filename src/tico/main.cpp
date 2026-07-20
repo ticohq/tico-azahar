@@ -21,6 +21,7 @@
 #include <string_view>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <vector>
 
 #include "audio_core/input_details.h"
 #include "audio_core/sink_details.h"
@@ -34,6 +35,7 @@
 #include "common/param_package.h"
 #include "common/settings.h"
 #include "common/string_util.h"
+#include "core/cheats/cheat_base.h"
 #include "core/core.h"
 #include "core/frontend/applets/default_applets.h"
 #include "core/frontend/image_interface.h"
@@ -786,6 +788,17 @@ void ToggleUprightScreen() {
                                          SwitchFrontend::OverlayUI::ToastCorner::TopRight);
 }
 
+void ToggleSwapScreens() {
+    const bool current = Settings::values.swap_screen.GetValue();
+    const bool next = !current;
+    Settings::values.swap_screen.SetValue(next);
+    SwitchFrontend::TicoConfig::SetConfigValue("swap_screens", next ? "true" : "false");
+    SwitchFrontend::TicoConfig::SaveConfig();
+    DebugLog("swap screens toggled: %d -> %d", current ? 1 : 0, next ? 1 : 0);
+    SwitchFrontend::OverlayUI::ShowToast(next ? "Screens swapped" : "Screens normal",
+                                         SwitchFrontend::OverlayUI::ToastCorner::TopRight);
+}
+
 // Rising-edge detection so each press advances a single layout instead of cycling
 // every frame the combo is held. Shares the frontend pad state updated in Run().
 bool LayoutComboPressed() {
@@ -801,6 +814,15 @@ bool UprightComboPressed() {
     static bool was_down = false;
     const u64 buttons = padGetButtons(&pad);
     const bool down = (buttons & HidNpadButton_L) && (buttons & HidNpadButton_Minus);
+    const bool triggered = down && !was_down;
+    was_down = down;
+    return triggered;
+}
+
+bool SwapScreensHotkeyPressed() {
+    static bool was_down = false;
+    const u64 buttons = padGetButtons(&pad);
+    const bool down = (buttons & HidNpadButton_StickL) != 0;
     const bool triggered = down && !was_down;
     was_down = down;
     return triggered;
@@ -902,6 +924,44 @@ void ConfigureOverlay(Core::System& system, const std::string& display_title) {
                    info.status == Core::SaveStateInfo::ValidationStatus::OK;
         });
     });
+
+    SwitchFrontend::OverlayUI::SetCheatCallbacks(
+        [&system]() {
+            std::vector<SwitchFrontend::OverlayUI::CheatMenuEntry> entries;
+            const auto cheats = system.CheatEngine().GetCheats();
+            entries.reserve(cheats.size());
+            for (std::size_t i = 0; i < cheats.size(); ++i) {
+                const auto& cheat = cheats[i];
+                if (!cheat) {
+                    continue;
+                }
+
+                std::string name = cheat->GetName();
+                if (name.empty()) {
+                    char fallback[32];
+                    std::snprintf(fallback, sizeof(fallback), "Cheat %zu", i + 1);
+                    name = fallback;
+                }
+                entries.push_back({std::move(name), cheat->IsEnabled(), true,
+                                   static_cast<int>(i)});
+            }
+            return entries;
+        },
+        [&system, title_id](int source_index) {
+            if (title_id == 0 || source_index < 0) {
+                return false;
+            }
+
+            const auto cheats = system.CheatEngine().GetCheats();
+            const auto index = static_cast<std::size_t>(source_index);
+            if (index >= cheats.size() || !cheats[index]) {
+                return false;
+            }
+
+            cheats[index]->SetEnabled(!cheats[index]->IsEnabled());
+            system.CheatEngine().SaveCheatFile(title_id);
+            return true;
+        });
 }
 
 bool HandleOverlayAction(Core::System& system, SwitchFrontend::OverlayUI::Action action) {
@@ -1214,6 +1274,10 @@ int Run(int argc, char** argv) {
         if ((!overlay_initialized || !SwitchFrontend::VulkanOverlay::IsVisible()) &&
             UprightComboPressed()) {
             ToggleUprightScreen();
+        }
+        if ((!overlay_initialized || !SwitchFrontend::VulkanOverlay::IsVisible()) &&
+            SwapScreensHotkeyPressed()) {
+            ToggleSwapScreens();
         }
 
         const bool overlay_visible =

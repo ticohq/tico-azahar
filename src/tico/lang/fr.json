@@ -1,6 +1,7 @@
 {
     "emulator_save_state": "Sauvegarder",
     "emulator_load_state": "Charger",
+    "emulator_cheats": "Codes",
     "emulator_settings": "Paramètres",
     "emulator_exit_game": "Quitter le Jeu",
     "emulator_select_disc": "Sélectionner le Disque",
@@ -34,6 +35,7 @@
     "emulator_reset": "Réinitialiser",
     "emulator_disc": "Disque",
     "emulator_change": "Modifier",
+    "emulator_toggle": "Basculer",
     "emulator_back": "Retour",
     "emulator_select": "Sélectionner",
     "emulator_auto": "Auto",
@@ -41,5 +43,6 @@
     "emulator_stretch": "Étirer",
     "emulator_original": "Original",
     "emulator_no_discs": "Aucun disque trouvé",
+    "emulator_no_cheats": "Aucun code",
     "launcher_error_game_not_found": "Jeu introuvable"
 }

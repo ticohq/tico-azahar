@@ -120,6 +120,11 @@ std::string_view GetLanguageFilename(std::string_view language) {
         return "ja.json";
     if (language == "French")
         return "fr.json";
+    if (language == "German" || language == "Deutsch" || language == "de")
+        return "de.json";
+    if (language == "Russian" || language == "Russkiy" || language == "Русский" ||
+        language == "ru")
+        return "ru.json";
     if (language == "Chinese")
         return "zh.json";
     return "en.json";

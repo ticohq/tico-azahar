@@ -1,6 +1,7 @@
 {
     "emulator_save_state": "保存状态",
     "emulator_load_state": "加载状态",
+    "emulator_cheats": "金手指",
     "emulator_settings": "设置",
     "emulator_exit_game": "退出游戏",
     "emulator_select_disc": "选择光盘",
@@ -34,6 +35,7 @@
     "emulator_reset": "重置",
     "emulator_disc": "光盘",
     "emulator_change": "更改",
+    "emulator_toggle": "切换",
     "emulator_back": "返回",
     "emulator_select": "选择",
     "emulator_auto": "自动",
@@ -41,5 +43,6 @@
     "emulator_stretch": "拉伸",
     "emulator_original": "原始",
     "emulator_no_discs": "未找到光盘",
+    "emulator_no_cheats": "未找到金手指",
     "launcher_error_game_not_found": "未找到游戏"
 }

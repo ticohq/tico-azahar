@@ -1,6 +1,7 @@
 {
     "emulator_save_state": "ステートセーブ",
     "emulator_load_state": "ステートロード",
+    "emulator_cheats": "チート",
     "emulator_settings": "設定",
     "emulator_exit_game": "ゲーム終了",
     "emulator_select_disc": "ディスク選択",
@@ -34,6 +35,7 @@
     "emulator_reset": "リセット",
     "emulator_disc": "ディスク",
     "emulator_change": "変更",
+    "emulator_toggle": "切替",
     "emulator_back": "戻る",
     "emulator_select": "選択",
     "emulator_auto": "自動",
@@ -41,5 +43,6 @@
     "emulator_stretch": "ストレッチ",
     "emulator_original": "オリジナル",
     "emulator_no_discs": "ディスクが見つかりません",
+    "emulator_no_cheats": "チートが見つかりません",
     "launcher_error_game_not_found": "ゲームが見つかりません"
 }

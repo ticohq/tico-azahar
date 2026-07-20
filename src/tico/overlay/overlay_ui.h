@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace SwitchFrontend::OverlayUI {
 
@@ -48,6 +49,17 @@ bool HasTransientContent();
 // The Switch frontend registers one that queries azahar's savestate listing.
 using SlotOccupiedFn = std::function<bool(int slot)>;
 void SetSlotOccupiedCallback(SlotOccupiedFn callback);
+
+struct CheatMenuEntry {
+    std::string name;
+    bool enabled = false;
+    bool toggleable = true;
+    int source_index = -1;
+};
+
+using CheatListFn = std::function<std::vector<CheatMenuEntry>()>;
+using CheatToggleFn = std::function<bool(int source_index)>;
+void SetCheatCallbacks(CheatListFn list_callback, CheatToggleFn toggle_callback);
 
 struct NavInput {
     bool up;
