@@ -1,6 +1,6 @@
-// Copyright Citra Emulator Project / Azahar Emulator Project
+// Copyright 2026 Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Refer to the misc/licenses/gplv2.txt file included.
 
 #include <SDL.h>
 #include "sdl_joystick.h"
@@ -11,8 +11,21 @@ SDLJoystick::SDLJoystick(std::string guid_, int port_, SDL_Joystick* joystick,
                          SDL_GameController* game_controller)
     : guid{std::move(guid_)}, port{port_}, sdl_joystick{joystick, &SDL_JoystickClose},
       sdl_controller{game_controller, &SDL_GameControllerClose} {
-    EnableMotion();
     CreateControllerButtonMap();
+    CalibrateJoystickAxes();
+    EnableMotion();
+}
+
+void SDLJoystick::CalibrateJoystickAxes() {
+    if (!sdl_joystick)
+        return;
+    const int num_axes = SDL_JoystickNumAxes(sdl_joystick.get());
+    for (int axis = 0; axis < num_axes; ++axis) {
+        // assume the joystick is approximately centered at start.
+        // maybe not a great assumption but the best we've got.
+        const auto raw = SDL_JoystickGetAxis(sdl_joystick.get(), axis);
+        joystick_axis_centers[axis] = raw > 28000 ? 32767 : (raw < -28000 ? -32768 : 0);
+    }
 }
 
 bool SDLJoystick::IsButtonMappedToController(int button) const {
@@ -61,7 +74,10 @@ float SDLJoystick::GetAxis(int axis, bool isController) const {
         return SDL_GameControllerGetAxis(sdl_controller.get(),
                                          static_cast<SDL_GameControllerAxis>(axis)) /
                32767.0f;
-    return SDL_JoystickGetAxis(sdl_joystick.get(), axis) / 32767.0f;
+    const int16_t center = joystick_axis_centers.count(axis) ? joystick_axis_centers.at(axis) : 0;
+    const auto delta = SDL_JoystickGetAxis(sdl_joystick.get(), axis) - center;
+    const float range = delta >= 0 ? (32767.0f - center) : (center - (-32768.0f));
+    return range > 0.0f ? delta / range : 0.0f;
 }
 
 std::tuple<float, float> SDLJoystick::GetAnalog(int axis_x, int axis_y, bool isController) const {
@@ -125,7 +141,11 @@ int SDLJoystick::GetPort() const {
 }
 
 std::tuple<float, float, float> SDLJoystick::GetTouch(int pad) const {
-    return state.touchpad.at(pad);
+    std::lock_guard lock{mutex};
+    if (state.touchpad.contains(pad))
+        return state.touchpad.at(pad);
+    else
+        return std::tuple<float, float, float>(0.0f, 0.0f, 0.0f);
 }
 
 SDL_Joystick* SDLJoystick::GetSDLJoystick() const {
@@ -152,7 +172,6 @@ void SDLJoystick::CreateControllerButtonMap() {
     for (int i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++) {
         auto bind = SDL_GameControllerGetBindForButton(sdl_controller.get(),
                                                        static_cast<SDL_GameControllerButton>(i));
-
         if (bind.bindType == SDL_CONTROLLER_BINDTYPE_BUTTON) {
             mapped_joystick_buttons.insert(bind.value.button);
         }

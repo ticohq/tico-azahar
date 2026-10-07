@@ -90,10 +90,6 @@ if(IOS)
   target_link_libraries(citra_libretro PRIVATE "-framework CoreFoundation" "-framework Foundation")
 endif()
 
-if (SSE42_COMPILE_OPTION)
-  target_compile_definitions(citra_libretro PRIVATE CITRA_HAS_SSE42)
-endif()
-
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
     CMAKE_SYSTEM_NAME STREQUAL "iOS" OR
     CMAKE_SYSTEM_NAME STREQUAL "tvOS")
@@ -101,3 +97,5 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
 else()
   target_link_libraries(citra_libretro PRIVATE "-Wl,-Bsymbolic")
 endif()
+
+add_custom_target(azahar_libretro DEPENDS citra_libretro)

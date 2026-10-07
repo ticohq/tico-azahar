@@ -1,6 +1,6 @@
-// Copyright Citra Emulator Project / Azahar Emulator Project
+// Copyright 2017-2026 Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Refer to the misc/licenses/gplv2.txt file included.
 
 #include <future>
 #include <limits>
@@ -71,7 +71,8 @@ HostRoomWindow::~HostRoomWindow() = default;
 
 void HostRoomWindow::UpdateGameList(QStandardItemModel* list) {
     game_list->clear();
-    game_list->appendRow(new GameListItemPath(tr("%none%"), {}, std::numeric_limits<u64>::max(), 0,
+    game_list->appendRow(new GameListItemPath(QStringLiteral("%none%"), {},
+                                              std::numeric_limits<u64>::max(), 0,
                                               Service::FS::MediaType::NAND, false, false));
     for (int i = 0; i < list->rowCount(); i++) {
         auto parent = list->item(i, 0);

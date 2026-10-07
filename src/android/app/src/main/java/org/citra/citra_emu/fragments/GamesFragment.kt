@@ -1,6 +1,6 @@
-// Copyright Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2023-2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 package org.citra.citra_emu.fragments
 
@@ -244,7 +244,8 @@ class GamesFragment : Fragment() {
         return (
             version.contains("alpha") ||
                 version.contains("beta") ||
-                version.contains("rc")
+                version.contains("rc") ||
+                version.contains("test")
             )
     }
 
@@ -331,7 +332,7 @@ class GamesFragment : Fragment() {
         val leftInsets = barInsets.left + cutoutInsets.left
         val rightInsets = barInsets.right + cutoutInsets.right
         val mlpSwipe = binding.swipeRefresh.layoutParams as MarginLayoutParams
-        if (ViewCompat.getLayoutDirection(view) == ViewCompat.LAYOUT_DIRECTION_LTR) {
+        if (view.layoutDirection == View.LAYOUT_DIRECTION_LTR) {
             mlpSwipe.leftMargin = leftInsets + spacingNavigationRail
             mlpSwipe.rightMargin = rightInsets
         } else {

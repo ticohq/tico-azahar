@@ -1,6 +1,6 @@
-// Copyright Citra Emulator Project / Azahar Emulator Project
+// Copyright 2026 Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Refer to the misc/licenses/gplv2.txt file included.
 
 #pragma once
 
@@ -69,8 +69,10 @@ private:
     bool has_accel{false};
     std::unique_ptr<SDL_Joystick, void (*)(SDL_Joystick*)> sdl_joystick;
     std::unique_ptr<SDL_GameController, void (*)(SDL_GameController*)> sdl_controller;
+    std::unordered_map<int, int16_t> joystick_axis_centers;
     mutable std::mutex mutex;
     std::unordered_set<int> mapped_joystick_buttons;
     void CreateControllerButtonMap();
+    void CalibrateJoystickAxes();
 };
 } // namespace InputCommon::SDL

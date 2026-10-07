@@ -1,8 +1,9 @@
-// Copyright Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2024-2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 #include <clocale>
+#include <format>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -66,7 +67,9 @@
 #ifdef ENABLE_DISCORD_RPC
 #include "citra_qt/discord.h"
 #endif
+#ifdef ENABLE_FFMPEG
 #include "citra_qt/dumping/dumping_dialog.h"
+#endif
 #include "citra_qt/game_list.h"
 #include "citra_qt/hotkeys.h"
 #include "citra_qt/loading_screen.h"
@@ -85,7 +88,7 @@
 #include "citra_qt/util/util.h"
 #include "common/arch.h"
 #include "common/common_paths.h"
-#include "common/dynamic_library/dynamic_library.h"
+#include "common/dynamic_library.h"
 #include "common/file_util.h"
 #include "common/literals.h"
 #include "common/logging/backend.h"
@@ -99,6 +102,7 @@
 #include "common/settings.h"
 #include "common/string_util.h"
 #include "common/zstd_compression.h"
+#include "core/arm/exception_handler.h"
 #include "core/core.h"
 #include "core/dumping/backend.h"
 #include "core/file_sys/archive_extsavedata.h"
@@ -234,7 +238,8 @@ void GMainWindow::ShowCommandOutput(std::string title, std::string message) {
 bool IsPrereleaseBuild() {
     return ((strstr(Common::g_build_fullname, "alpha") != NULL) ||
             (strstr(Common::g_build_fullname, "beta") != NULL) ||
-            (strstr(Common::g_build_fullname, "rc") != NULL));
+            (strstr(Common::g_build_fullname, "rc") != NULL) ||
+            (strstr(Common::g_build_fullname, "test") != NULL));
 }
 
 #ifdef ENABLE_QT_UPDATE_CHECKER
@@ -276,10 +281,6 @@ GMainWindow::GMainWindow(Core::System& system_)
         // Dump video
         if (args[i] == QStringLiteral("--dump-video") || args[i] == QStringLiteral("-d")) {
             if (i >= args.size() - 1 || args[i + 1].startsWith(QChar::fromLatin1('-'))) {
-                continue;
-            }
-            if (!DynamicLibrary::FFmpeg::LoadFFmpeg()) {
-                ShowFFmpegErrorMessage();
                 continue;
             }
             video_dumping_path = args[++i];
@@ -458,6 +459,11 @@ GMainWindow::GMainWindow(Core::System& system_)
 
     LOG_INFO(Frontend, "Azahar Version: {} | {}-{}", Common::g_build_fullname, Common::g_scm_branch,
              Common::g_scm_desc);
+    std::string build_variant = Common::g_build_variant;
+    if (build_variant == "") {
+        build_variant = "N/A";
+    }
+    LOG_INFO(Frontend, "Build Variant: {}", build_variant);
 #if CITRA_ARCH(x86_64)
     const auto& caps = Common::GetCPUCaps();
     std::string cpu_string = caps.cpu_string;
@@ -555,6 +561,9 @@ void GMainWindow::InitializeWidgets() {
     secondary_window->hide();
     secondary_window->setParent(nullptr);
 
+#ifndef ENABLE_FFMPEG
+    ui->action_Dump_Video->setVisible(false);
+#endif
     game_list = new GameList(*play_time_manager, this);
     ui->horizontalLayout->addWidget(game_list);
 
@@ -1195,7 +1204,9 @@ void GMainWindow::ConnectMenuEvents() {
         }
     });
     connect_menu(ui->action_Capture_Screenshot, &GMainWindow::OnCaptureScreenshot);
+#ifdef ENABLE_FFMPEG
     connect_menu(ui->action_Dump_Video, &GMainWindow::OnDumpVideo);
+#endif
 
     // Tools debug
     connect_menu(ui->action_Debug_Pause, [this] {
@@ -1256,9 +1267,9 @@ void GMainWindow::UpdateMenuState() {
     ui->action_Advance_Frame->setEnabled(emulation_running && is_paused);
 
     if (emulation_running && is_paused) {
-        ui->action_Pause->setText(tr("&Continue"));
+        ui->action_Pause->setText(tr("Continue"));
     } else {
-        ui->action_Pause->setText(tr("&Pause"));
+        ui->action_Pause->setText(tr("Pause"));
     }
 }
 
@@ -1424,7 +1435,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
             break;
         case Core::System::ResultStatus::ErrorLoader:
             QMessageBox::critical(this, tr("Generic load error"),
-                                  tr("An generic load error occurred while loading the "
+                                  tr("A generic load error occurred while loading the "
                                      "application.<br/>Please check the log for more details."));
             break;
         case Core::System::ResultStatus::ErrorLoader_ErrorPatches:
@@ -1556,11 +1567,13 @@ void GMainWindow::BootGame(const QString& filename) {
 
     ui->action_Advance_Frame->setEnabled(false);
 
+#ifdef ENABLE_FFMPEG
     if (video_dumping_on_start) {
         StartVideoDumping(video_dumping_path);
         video_dumping_on_start = false;
         video_dumping_path.clear();
     }
+#endif()
 
     // Register debug widgets
     if (graphicsWidget && graphicsWidget->isVisible()) {
@@ -1628,12 +1641,14 @@ void GMainWindow::ShutdownGame() {
         HideFullscreen();
     }
 
+#ifdef ENABLE_FFMPEG
     auto video_dumper = system.GetVideoDumper();
     if (video_dumper && video_dumper->IsDumping()) {
         game_shutdown_delayed = true;
         OnStopVideoDumping();
         return;
     }
+#endif
 
     AllowOSSleep();
 
@@ -1801,28 +1816,21 @@ void GMainWindow::UpdateSaveStates() {
         if (savestate.slot >= Core::SaveStateSlotCount) {
             continue;
         }
-        const bool display_name =
-            savestate.status == Core::SaveStateInfo::ValidationStatus::RevisionDismatch &&
-            !savestate.build_name.empty();
         actions_load_state[savestate.slot]->setEnabled(true);
         if (savestate.slot == 0) {
-            const auto text = tr("%2 %3")
+            const auto text = QStringLiteral("%2")
                                   .arg(QDateTime::fromSecsSinceEpoch(savestate.time)
                                            .toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
-                                  .arg(display_name ? QString::fromStdString(savestate.build_name)
-                                                    : QLatin1String())
                                   .trimmed();
             ui->action_Quick_Save->setText(tr("Quick Save - %1").arg(text).trimmed());
             ui->action_Quick_Load->setText(tr("Quick Load - %1").arg(text).trimmed());
             continue;
         }
-        const auto text =
-            tr("Slot %1 - %2 %3")
-                .arg(savestate.slot)
-                .arg(QDateTime::fromSecsSinceEpoch(savestate.time)
-                         .toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
-                .arg(display_name ? QString::fromStdString(savestate.build_name) : QLatin1String())
-                .trimmed();
+        const auto text = tr("Slot %1 - %2")
+                              .arg(savestate.slot)
+                              .arg(QDateTime::fromSecsSinceEpoch(savestate.time)
+                                       .toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
+                              .trimmed();
 
         actions_load_state[savestate.slot]->setText(text);
         actions_save_state[savestate.slot]->setText(text);
@@ -2225,7 +2233,7 @@ void GMainWindow::OnGameListDumpRomFS(QString game_path, u64 program_id) {
                 const auto& [base, update] = future_watcher->result();
                 if (base != Loader::ResultStatus::Success) {
                     QMessageBox::critical(
-                        this, tr("Azahar"),
+                        this, QStringLiteral("Azahar"),
                         tr("Could not dump base RomFS.\nRefer to the log for details."));
                     return;
                 }
@@ -2299,9 +2307,8 @@ void GMainWindow::OnGameListOpenPerGameProperties(const QString& file) {
 void GMainWindow::OnMenuLoadFile() {
     const QString extensions = QStringLiteral("*.").append(
         GameList::supported_file_extensions.join(QStringLiteral(" *.")));
-    const QString file_filter = tr("3DS Executable (%1);;All Files (*.*)",
-                                   "%1 is an identifier for the 3DS executable file extensions.")
-                                    .arg(extensions);
+    const QString file_filter = tr("3DS Executable") + QStringLiteral(" (%1)").arg(extensions) +
+                                QStringLiteral(";;") + tr("All Files") + QStringLiteral(" (*.*)");
     const QString filename = QFileDialog::getOpenFileName(
         this, tr("Load File"), UISettings::values.roms_path, file_filter);
 
@@ -2346,15 +2353,15 @@ void GMainWindow::OnMenuSetUpSystemFiles() {
     QLineEdit textInput(UISettings::values.last_artic_base_addr, &dialog);
     layout_h.addWidget(&textInput);
 
-    QLabel label_select(tr("<br>Choose setup mode:"), &dialog);
+    QLabel label_select(QStringLiteral("<br>") + tr("Choose setup mode:"), &dialog);
     layout.addWidget(&label_select);
 
     std::pair<bool, bool> install_state = Core::AreSystemTitlesInstalled();
 
     QRadioButton radio1(&dialog);
     QRadioButton radio2(&dialog);
-    QString new3dsSetupString = tr("Old 3DS setup");
-    QString old3dsSetupString = tr("New 3DS setup");
+    QString new3dsSetupString = tr("New 3DS setup");
+    QString old3dsSetupString = tr("Old 3DS setup");
     QString availableIcon = QStringLiteral("(\u2139\uFE0F) ");
     QString unavailableIcon = QStringLiteral("(\u26A0) ");
     QString installedIcon = QStringLiteral("(\u2705) ");
@@ -2415,7 +2422,8 @@ void GMainWindow::OnMenuSetUpSystemFiles() {
 void GMainWindow::OnMenuInstallCIA() {
     QStringList filepaths = QFileDialog::getOpenFileNames(
         this, tr("Load Files"), UISettings::values.roms_path,
-        tr("3DS Installation File (*.cia *.zcia)") + QStringLiteral(";;") + tr("All Files (*.*)"));
+        tr("3DS Installation File") + QStringLiteral(" (*.cia *.zcia);;") + tr("All Files") +
+            QStringLiteral(" (*.*)"));
 
     if (filepaths.isEmpty()) {
         return;
@@ -2577,9 +2585,10 @@ void GMainWindow::UninstallTitles(
     future_watcher.waitForFinished();
 
     if (failed) {
-        QMessageBox::critical(this, tr("Azahar"), tr("Failed to uninstall '%1'.").arg(failed_name));
+        QMessageBox::critical(this, QStringLiteral("Azahar"),
+                              tr("Failed to uninstall '%1'.").arg(failed_name));
     } else if (!future_watcher.isCanceled()) {
-        QMessageBox::information(this, tr("Azahar"),
+        QMessageBox::information(this, QStringLiteral("Azahar"),
                                  tr("Successfully uninstalled '%1'.").arg(first_name));
         emit InstalledTitlesChanged();
     }
@@ -3058,7 +3067,8 @@ void GMainWindow::OnLoadAmiibo() {
     }
 
     const QString extensions{QStringLiteral("*.bin")};
-    const QString file_filter = tr("Amiibo File (%1);; All Files (*.*)").arg(extensions);
+    const QString file_filter = tr("Amiibo File") + QStringLiteral(" (%1);;").arg(extensions) +
+                                tr("All Files") + QStringLiteral(" (*.*)");
     const QString filename = QFileDialog::getOpenFileName(this, tr("Load Amiibo"), {}, file_filter);
 
     if (filename.isEmpty()) {
@@ -3249,43 +3259,15 @@ void GMainWindow::OnCaptureScreenshot() {
     }
 }
 
-void GMainWindow::ShowFFmpegErrorMessage() {
-    QMessageBox message_box;
-    message_box.setWindowTitle(tr("Could not load video dumper"));
-    message_box.setText(
-        tr("FFmpeg could not be loaded. Make sure you have a compatible version installed."
-#ifdef _WIN32
-           "\n\nTo install FFmpeg to Azahar, press Open and select your FFmpeg directory."
-#endif
-           "\n\nTo view a guide on how to install FFmpeg, press Help."));
-    message_box.setStandardButtons(QMessageBox::Ok | QMessageBox::Help
-#ifdef _WIN32
-                                   | QMessageBox::Open
-#endif
-    );
-    auto result = message_box.exec();
-    if (result == QMessageBox::Help) {
-        QDesktopServices::openUrl(
-            QUrl(QStringLiteral("https://github.com/azahar-emu/azahar/wiki/Installing-FFmpeg")));
-#ifdef _WIN32
-    } else if (result == QMessageBox::Open) {
-        OnOpenFFmpeg();
-#endif
-    }
-}
-
+#ifdef ENABLE_FFMPEG
 void GMainWindow::OnDumpVideo() {
-    if (DynamicLibrary::FFmpeg::LoadFFmpeg()) {
-        if (ui->action_Dump_Video->isChecked()) {
-            OnStartVideoDumping();
-        } else {
-            OnStopVideoDumping();
-        }
+    if (ui->action_Dump_Video->isChecked()) {
+        OnStartVideoDumping();
     } else {
-        ui->action_Dump_Video->setChecked(false);
-        ShowFFmpegErrorMessage();
+        OnStopVideoDumping();
     }
 }
+#endif
 
 void GMainWindow::OnCompressFile() {
     // NOTE: Encrypted files SHOULD NEVER be compressed, otherwise the resulting
@@ -3295,10 +3277,10 @@ void GMainWindow::OnCompressFile() {
     //
     // This is enforced using the loaders as they already return an error on encryption.
 
-    QStringList filepaths =
-        QFileDialog::getOpenFileNames(this, tr("Load 3DS ROM Files"), UISettings::values.roms_path,
-                                      tr("3DS ROM Files (*.cia *.cci *.3dsx *.cxi *.3ds)") +
-                                          QStringLiteral(";;") + tr("All Files (*.*)"));
+    QStringList filepaths = QFileDialog::getOpenFileNames(
+        this, tr("Load 3DS ROM Files"), UISettings::values.roms_path,
+        tr("3DS ROM Files") + QStringLiteral(" (*.cia *.cci *.3dsx *.cxi *.3ds);;") +
+            tr("All Files") + QStringLiteral(" (*.*)"));
 
     QString out_path;
 
@@ -3321,9 +3303,9 @@ void GMainWindow::OnCompressFile() {
             QStringLiteral(".") +
             QString::fromStdString(compress_info.value().first.recommended_compressed_extension);
 
-        QString out_filter = tr("3DS Compressed ROM File (*.%1)")
-                                 .arg(QString::fromStdString(
-                                     compress_info.value().first.recommended_compressed_extension));
+        QString out_filter = tr("3DS Compressed ROM File") +
+                             QStringLiteral(" (*.%1)").arg(QString::fromStdString(
+                                 compress_info.value().first.recommended_compressed_extension));
         out_path = QFileDialog::getSaveFileName(this, tr("Save 3DS Compressed ROM File"),
                                                 final_path, out_filter);
         if (out_path.isEmpty()) {
@@ -3390,8 +3372,8 @@ void GMainWindow::OnDecompressFile() {
 
     QStringList filepaths = QFileDialog::getOpenFileNames(
         this, tr("Load 3DS Compressed ROM Files"), UISettings::values.roms_path,
-        tr("3DS Compressed ROM Files (*.zcia *zcci *z3dsx *zcxi)") + QStringLiteral(";;") +
-            tr("All Files (*.*)"));
+        tr("3DS Compressed ROM Files") + QStringLiteral(" (*.zcia *zcci *z3dsx *zcxi)") +
+            QStringLiteral(";;") + tr("All Files") + QStringLiteral(" (*.*)"));
 
     QString out_path;
 
@@ -3414,10 +3396,9 @@ void GMainWindow::OnDecompressFile() {
             QStringLiteral(".") +
             QString::fromStdString(compress_info.value().first.recommended_uncompressed_extension);
 
-        QString out_filter =
-            tr("3DS ROM File (*.%1)")
-                .arg(QString::fromStdString(
-                    compress_info.value().first.recommended_uncompressed_extension));
+        QString out_filter = tr("3DS ROM File") +
+                             QStringLiteral(" (*.%1)").arg(QString::fromStdString(
+                                 compress_info.value().first.recommended_uncompressed_extension));
         out_path =
             QFileDialog::getSaveFileName(this, tr("Save 3DS ROM File"), final_path, out_filter);
         if (out_path.isEmpty()) {
@@ -3479,62 +3460,7 @@ void GMainWindow::OnDecompressFile() {
     });
 }
 
-#ifdef _WIN32
-void GMainWindow::OnOpenFFmpeg() {
-    auto filename =
-        QFileDialog::getExistingDirectory(this, tr("Select FFmpeg Directory")).toStdString();
-    if (filename.empty()) {
-        return;
-    }
-    // Check for a bin directory if they chose the FFmpeg root directory.
-    auto bin_dir = filename + DIR_SEP + "bin";
-    if (!FileUtil::Exists(bin_dir)) {
-        // Otherwise, assume the user directly selected the directory containing the DLLs.
-        bin_dir = filename;
-    }
-
-    static const std::array library_names = {
-        Common::DynamicLibrary::GetLibraryName("avcodec", LIBAVCODEC_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("avfilter", LIBAVFILTER_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("avformat", LIBAVFORMAT_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("avutil", LIBAVUTIL_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("swresample", LIBSWRESAMPLE_VERSION_MAJOR),
-    };
-
-    for (auto& library_name : library_names) {
-        if (!FileUtil::Exists(bin_dir + DIR_SEP + library_name)) {
-            QMessageBox::critical(this, tr("Azahar"),
-                                  tr("The provided FFmpeg directory is missing %1. Please make "
-                                     "sure the correct directory was selected.")
-                                      .arg(QString::fromStdString(library_name)));
-            return;
-        }
-    }
-
-    std::atomic<bool> success(true);
-    auto process_file = [&success](u64* num_entries_out, const std::string& directory,
-                                   const std::string& virtual_name) -> bool {
-        auto file_path = directory + DIR_SEP + virtual_name;
-        if (file_path.ends_with(".dll")) {
-            auto destination_path = FileUtil::GetExeDirectory() + DIR_SEP + virtual_name;
-            if (!FileUtil::Copy(file_path, destination_path)) {
-                success.store(false);
-                return false;
-            }
-        }
-        return true;
-    };
-    FileUtil::ForeachDirectoryEntry(nullptr, bin_dir, process_file);
-
-    if (success.load()) {
-        QMessageBox::information(this, tr("Azahar"), tr("FFmpeg has been sucessfully installed."));
-    } else {
-        QMessageBox::critical(this, tr("Azahar"),
-                              tr("Installation of FFmpeg failed. Check the log file for details."));
-    }
-}
-#endif
-
+#ifdef ENABLE_FFMPEG
 void GMainWindow::OnStartVideoDumping() {
     DumpingDialog dialog(this, system);
     if (dialog.exec() != QDialog::DialogCode::Accepted) {
@@ -3559,7 +3485,7 @@ void GMainWindow::StartVideoDumping(const QString& path) {
         system.RegisterVideoDumper(dumper);
     } else {
         QMessageBox::critical(
-            this, tr("Azahar"),
+            this, QStringLiteral("Azahar"),
             tr("Could not start video dumping.<br>Please ensure that the video encoder is "
                "configured correctly.<br>Refer to the log for details."));
         ui->action_Dump_Video->setChecked(false);
@@ -3595,6 +3521,7 @@ void GMainWindow::OnStopVideoDumping() {
         future_watcher->setFuture(future);
     }
 }
+#endif
 
 void GMainWindow::UpdateStatusBar() {
     if (!emu_thread) [[unlikely]] {
@@ -3644,7 +3571,7 @@ void GMainWindow::UpdateStatusBar() {
                                tr("(Accessing SaveData)")),
             };
 
-        const QString unit = do_mb ? tr("MB/s") : tr("KB/s");
+        const QString unit = do_mb ? QStringLiteral("MB/s") : QStringLiteral("KB/s");
         QString event{};
         for (auto p : perf_events) {
             if (results.artic_events.Get(p.first)) {
@@ -3858,8 +3785,76 @@ void GMainWindow::showEvent([[maybe_unused]] QShowEvent* event) {
     game_list->PopulateAsync(UISettings::values.game_dirs);
 }
 
+bool GMainWindow::ShowExceptionDialog(Core::System::ResultStatus result,
+                                      const std::string& details) {
+    QDialog dialog(this);
+    dialog.setWindowTitle(result == Core::System::ResultStatus::ErrorCoreExceptionRaised
+                              ? tr("An exception occurred")
+                              : tr("An invalid memory access occurred"));
+
+    dialog.setMinimumSize(600, 500);
+
+    auto* layout = new QVBoxLayout(&dialog);
+
+    auto* label = new QLabel(
+        result == Core::System::ResultStatus::ErrorCoreExceptionRaised
+            ? tr("An exception occurred while executing the emulated application.")
+            : tr("An invalid memory access occurred while executing the emulated application."));
+
+    layout->addWidget(label);
+
+    auto* textEdit = new QPlainTextEdit();
+    textEdit->setPlainText(QString::fromStdString(details));
+    textEdit->setReadOnly(true);
+    QFont monoFont(QStringLiteral("Monospace"));
+    monoFont.setStyleHint(QFont::TypeWriter);
+    monoFont.setPointSize(10);
+    textEdit->setFont(monoFont);
+    textEdit->setLineWrapMode(QPlainTextEdit::NoWrap);
+    layout->addWidget(textEdit);
+
+    auto* buttonLayout = new QHBoxLayout();
+
+    auto* ignoreButton = new QPushButton(tr("Ignore for this Session"));
+
+    QObject::connect(ignoreButton, &QPushButton::clicked,
+                     []() { Core::SetIgnoreExceptionsForSession(true); });
+
+    buttonLayout->addWidget(ignoreButton);
+    buttonLayout->addStretch();
+
+    auto* continueButton = new QPushButton(tr("Continue"));
+    QObject::connect(continueButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    buttonLayout->addWidget(continueButton);
+
+    auto* stopButton = new QPushButton(tr("Stop Emulation"));
+    QObject::connect(stopButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    buttonLayout->addWidget(stopButton);
+
+    layout->addLayout(buttonLayout);
+
+    return dialog.exec() == QDialog::Accepted;
+}
+
 void GMainWindow::OnCoreError(Core::System::ResultStatus result, std::string details) {
     QString status_message;
+
+    // Handle exception dialogs separately
+    if (result == Core::System::ResultStatus::ErrorCoreExceptionRaised) {
+        if (ShowExceptionDialog(result, details)) {
+            if (emu_thread) {
+                ShutdownGame();
+                return;
+            }
+        }
+
+        if (emu_thread) {
+            emu_thread->SetRunning(true);
+            message_label->setText(status_message);
+            message_label_used_for_movie = false;
+        }
+        return;
+    }
 
     QString title, message;
     QMessageBox::Icon error_severity_icon;
@@ -3890,17 +3885,16 @@ void GMainWindow::OnCoreError(Core::System::ResultStatus result, std::string det
                    .c_str());
         error_severity_icon = QMessageBox::Icon::Critical;
         can_continue = false;
-    } else if (result == Core::System::ResultStatus::ErrorCoreExceptionRaised) {
-        title = tr("An exception occurred");
-        message = tr("An exception occurred while executing the emulated application.\n\n");
-        message += QString::fromStdString(details);
-        error_severity_icon = QMessageBox::Icon::Critical;
-        can_continue = false;
-    } else if (result == Core::System::ResultStatus::ErrorMemoryExceptionRaised) {
-        title = tr("An invalid memory access occurred");
-        message =
-            tr("An invalid memory access occurred while executing the emulated application.\n\n");
-        message += QString::fromStdString(details);
+    } else if (result == Core::System::ResultStatus::ErrorSavestateBuildMismatch) {
+        title = tr("Savestate version mismatch");
+        message = tr("Could not load savestate because it was created on a different Azahar "
+                     "version:<br/>"
+                     "<b>Azahar %1</b>.<br/><br/>Please read our blog entry <a "
+                     "href='https://azahar-emu.org/blog/understanding-save-states/'>understanding "
+                     "savestates</a> for more information.<br/><br/>To recover your progress, "
+                     "downgrade to <b>Azahar %1</b>, load this savestate and use the application's "
+                     "built-in save functionality.")
+                      .arg(QString::fromStdString(details));
         error_severity_icon = QMessageBox::Icon::Critical;
     } else {
         title = tr("Fatal Error");
@@ -3957,7 +3951,7 @@ bool GMainWindow::ConfirmClose() {
     }
 
     QMessageBox::StandardButton answer =
-        QMessageBox::question(this, tr("Azahar"), tr("Would you like to exit now?"),
+        QMessageBox::question(this, QStringLiteral("Azahar"), tr("Would you like to exit now?"),
                               QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     return answer != QMessageBox::No;
 }
@@ -4053,7 +4047,7 @@ bool GMainWindow::ConfirmChangeGame() {
     }
 
     auto answer = QMessageBox::question(
-        this, tr("Azahar"),
+        this, QStringLiteral("Azahar"),
         tr("The application is still running. Would you like to stop emulation?"),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     return answer != QMessageBox::No;
@@ -4430,6 +4424,56 @@ static Qt::HighDpiScaleFactorRoundingPolicy GetHighDpiRoundingPolicy() {
 #endif
 }
 
+#ifdef _WIN32
+void GMainWindow::UpdateScrollBarStyle() {
+    constexpr auto customScrollbarStyleTemplate = (R"(
+        QScrollBar:vertical {{
+            background: palette(window);
+            width: 16px;
+            margin: 0px;
+            border-left: 1px solid palette({0});
+        }}
+        QScrollBar::handle:vertical {{
+            background: palette({1});
+            border: none;
+            border-radius: 4.5px;
+            margin: 3px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background: palette({0});
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            border: none;
+            height: 0px;
+        }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+            background: none;
+        }}
+    )");
+
+    const auto darkCustomScrollbarStyle =
+        QString::fromUtf8(std::format(customScrollbarStyleTemplate, "midlight", "light"));
+    const auto lightCustomScrollbarStyle =
+        QString::fromUtf8(std::format(customScrollbarStyleTemplate, "dark", "mid"));
+
+    const bool isDarkMode = (QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+
+    if (isDarkMode) {
+        setStyleSheet(darkCustomScrollbarStyle);
+    } else {
+        setStyleSheet(lightCustomScrollbarStyle);
+    }
+}
+
+void GMainWindow::changeEvent(QEvent* event) {
+    if (event->type() == QEvent::PaletteChange ||
+        event->type() == QEvent::ApplicationPaletteChange) {
+        UpdateScrollBarStyle();
+    }
+    QMainWindow::changeEvent(event);
+}
+#endif
+
 int LaunchQtFrontend(int argc, char* argv[]) {
 #ifdef __APPLE__
     // Ensure that the linker doesn't optimize qt_swizzle.mm out of existence.
@@ -4487,6 +4531,10 @@ int LaunchQtFrontend(int argc, char* argv[]) {
     system.RegisterImageInterface(std::make_shared<QtImageInterface>());
 
     GMainWindow main_window(system);
+
+#ifdef _WIN32
+    main_window.UpdateScrollBarStyle();
+#endif
 
     // Register frontend applets
     Frontend::RegisterDefaultApplets(system);
