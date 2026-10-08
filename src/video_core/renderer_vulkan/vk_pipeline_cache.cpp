@@ -383,6 +383,27 @@ void PipelineCache::SwitchDiskCache(u64 title_id, const std::atomic_bool& stop_l
     }
 }
 
+void PipelineCache::WaitPipelineBuilt(GraphicsPipeline& pipeline) {
+    const auto start = std::chrono::steady_clock::now();
+    pipeline.WaitDone();
+    const auto now = std::chrono::steady_clock::now();
+
+    compile_stall += now - start;
+    compile_stall_count++;
+
+    if (now - last_stall_report < STALL_REPORT_INTERVAL) {
+        return;
+    }
+    const auto stall_ms = std::chrono::duration_cast<std::chrono::milliseconds>(compile_stall);
+    if (stall_ms >= MIN_REPORTED_STALL) {
+        LOG_INFO(Render_Vulkan, "Blocked {} ms on {} pipeline compiles", stall_ms.count(),
+                 compile_stall_count);
+    }
+    last_stall_report = now;
+    compile_stall = {};
+    compile_stall_count = 0;
+}
+
 bool PipelineCache::BindPipeline(PipelineInfo& info, bool wait_built) {
     MICROPROFILE_SCOPE(Vulkan_Bind);
 
@@ -391,17 +412,21 @@ bool PipelineCache::BindPipeline(PipelineInfo& info, bool wait_built) {
     }
 
     GraphicsPipeline* const pipeline = curr_disk_cache->GetPipeline(info);
-    if (!pipeline->IsDone() && !pipeline->TryBuild(wait_built)) {
+    if (!pipeline->IsDone()) {
+        if (!pipeline->TryBuild(wait_built)) {
 #ifdef __SWITCH__
-        static std::atomic<u64> async_skip_count{};
-        const u64 skip_count = ++async_skip_count;
-        if ((skip_count & (skip_count - 1)) == 0) {
-            LOG_INFO(Render_Vulkan,
-                     "Switch async pipeline skip count={} wait_built={} pipeline_done=0",
-                     skip_count, wait_built ? 1 : 0);
-        }
+            static std::atomic<u64> async_skip_count{};
+            const u64 skip_count = ++async_skip_count;
+            if ((skip_count & (skip_count - 1)) == 0) {
+                LOG_INFO(Render_Vulkan,
+                         "Switch async pipeline skip count={} wait_built={} pipeline_done=0",
+                         skip_count, wait_built ? 1 : 0);
+            }
 #endif
-        return false;
+            return false;
+        }
+        // here rather than in the scheduler worker, which would stall every recorded command
+        WaitPipelineBuilt(*pipeline);
     }
 
     const bool is_dirty = scheduler.IsStateDirty(StateFlags::Pipeline);
@@ -533,9 +558,6 @@ bool PipelineCache::BindPipeline(PipelineInfo& info, bool wait_built) {
         }
 
         if (pipeline_dirty) {
-            if (!pipeline->IsDone()) {
-                pipeline->WaitDone();
-            }
             cmdbuf.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->Handle());
         }
 
