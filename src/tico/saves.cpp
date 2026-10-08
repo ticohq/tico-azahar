@@ -136,9 +136,12 @@ std::string UndoPath(u64 title_id) {
 void UseTicoFolders() {
     UseFolder(FileUtil::UserPath::SDMCDir, ContentDir("tico_saves_path", "sdmc:/tico/saves/"));
     UseFolder(FileUtil::UserPath::StatesDir, ContentDir("tico_states_path", "sdmc:/tico/states/"));
-    LOG_INFO(Frontend, "saves: SD card in {}, states in {}",
+    // LayeredFS mods (translations, patches), as tico-dolphin keeps the Wii's in mods/wii
+    UseFolder(FileUtil::UserPath::ModsDir, "sdmc:/tico/mods/3ds/");
+    LOG_INFO(Frontend, "saves: SD card in {}, states in {}, mods in {}",
              FileUtil::GetUserPath(FileUtil::UserPath::SDMCDir),
-             FileUtil::GetUserPath(FileUtil::UserPath::StatesDir));
+             FileUtil::GetUserPath(FileUtil::UserPath::StatesDir),
+             FileUtil::GetUserPath(FileUtil::UserPath::ModsDir));
 }
 
 std::string StatePath(u64 title_id, int slot) {

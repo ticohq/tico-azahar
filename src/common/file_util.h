@@ -66,6 +66,7 @@ enum class UserPath {
     LegacyLime3DSUserDir,
     LoadDir,
     LogDir,
+    ModsDir, // LayeredFS mods, a folder per title; load/mods by default
     NANDDir,
     RootDir,
     SDMCDir,

@@ -804,8 +804,8 @@ void GameList::AddGamePopup(QMenu& context_menu, const QString& path, const QStr
         }
     });
     connect(open_mods_location, &QAction::triggered, this, [this, program_id] {
-        if (FileUtil::CreateFullPath(fmt::format("{}mods/{:016X}/",
-                                                 FileUtil::GetUserPath(FileUtil::UserPath::LoadDir),
+        if (FileUtil::CreateFullPath(fmt::format("{}{:016X}/",
+                                                 FileUtil::GetUserPath(FileUtil::UserPath::ModsDir),
                                                  program_id))) {
             emit OpenFolderRequested(program_id, GameListOpenTarget::MODS);
         }
