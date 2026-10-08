@@ -325,6 +325,9 @@ vk::UniqueInstance CreateInstance(const Common::DynamicLibrary& library,
                                   bool dump_command_buffers) {
 #if defined(__SWITCH__)
     (void)library;
+    // Mesa's own shader cache, so pipelines compiled once build quickly the next time
+    setenv("MESA_SHADER_CACHE_DISABLE", "false", 1);
+    setenv("MESA_SHADER_CACHE_DIR", "sdmc:/tico/system/3ds/cache/mesa", 1);
     uint32_t icd_version = 7;
     vk_icdNegotiateLoaderICDInterfaceVersion(&icd_version);
 
