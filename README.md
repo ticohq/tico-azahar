@@ -44,7 +44,7 @@ This fork follows Azahar's existing content support boundaries:
 
 ## Frame Generation
 
-Settings > Graphics > Frame Generation interpolates extra frames with Lossless Scaling's frame generation, through [lsfg-vk](https://github.com/PancakeTAS/lsfg-vk), as ported to the Switch by [dekopon](https://github.com/PalindromicBreadLoaf/dekopon) (@PalindromicBreadLoaf). It turns on only for games that run at a low frame rate, which then reach the display rate.
+Settings > Graphics > Frame Generation interpolates extra frames with Lossless Scaling's frame generation, through lsfg-vk. It turns on only for games that run at a low frame rate, which then reach the display rate.
 
 Its shaders come from Lossless Scaling itself, which is not included: copy `Lossless.dll` from your own copy of Lossless Scaling to `sdmc:/tico/system/3ds/lsfg/Lossless.dll`.
 
@@ -61,6 +61,13 @@ All core emulation work belongs to the Azahar team and its contributors, includi
 Official Azahar repository - [https://github.com/azahar-emu/azahar](https://github.com/azahar-emu/azahar)
 
 Azahar website - [https://azahar-emu.org](https://azahar-emu.org/)
+
+The Switch port also builds on other Switch ports:
+
+- **[dekopon](https://github.com/PalindromicBreadLoaf/dekopon)** by @PalindromicBreadLoaf: fastmem, the GPU thread, JIT and shader fixes, frame generation and more
+- **[raikopon](https://github.com/Raibatsu/raikopon)** by @Raibatsu: the background shader JIT and the speed hacks, through dekopon
+- **[ARMSX2-NX](https://github.com/PalindromicBreadLoaf/ARMSX2-NX)** and **[nezumiiruka](https://github.com/PalindromicBreadLoaf/nezumiiruka)** by @PalindromicBreadLoaf: the memory aliasing behind fastmem
+- **[lsfg-vk](https://github.com/PancakeTAS/lsfg-vk)** by @PancakeTAS: the frame generation backend
 
 ----------
 
