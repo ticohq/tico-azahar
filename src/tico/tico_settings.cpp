@@ -314,6 +314,17 @@ void ApplyLiveValues(const Values& values) {
     Settings::values.use_vsync.SetValue(GetBool(values, "azahar_vsync"));
     Settings::values.show_shader_compile_notice.SetValue(
         GetBool(values, "azahar_shader_notice"));
+    Settings::values.use_frame_generation.SetValue(GetBool(values, "azahar_frame_gen"));
+    if (const auto multiplier = GetInt(values, "azahar_frame_gen_multiplier")) {
+        Settings::values.frame_generation_multiplier.SetValue(
+            static_cast<u32>(std::clamp(*multiplier, 2, 4)));
+    }
+    if (const auto flow_scale = GetInt(values, "azahar_frame_gen_flow_scale")) {
+        Settings::values.frame_generation_flow_scale.SetValue(
+            static_cast<u32>(std::clamp(*flow_scale, 12, 100)));
+    }
+    Settings::values.frame_generation_performance_mode.SetValue(
+        GetBool(values, "azahar_frame_gen_performance"));
     Settings::values.skip_slow_draw.SetValue(GetBool(values, "azahar_skip_slow_draw"));
     Settings::values.skip_texture_copy.SetValue(GetBool(values, "azahar_skip_texture_copy"));
     Settings::values.skip_cpu_write.SetValue(GetBool(values, "azahar_skip_cpu_write"));

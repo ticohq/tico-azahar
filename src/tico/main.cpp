@@ -875,6 +875,27 @@ std::string TrFormat(const char* key, int value) {
     return text;
 }
 
+// Frame generation reads its shaders from the user's own copy of Lossless.dll; says
+// where it goes when the option is on and the file is not there, once per game.
+void WarnIfLosslessMissing() {
+#ifdef ENABLE_LSFG
+    static bool warned = false;
+    if (warned || !Settings::values.use_frame_generation.GetValue()) {
+        return;
+    }
+    const std::string path =
+        FileUtil::GetUserPath(FileUtil::UserPath::UserDir) + "lsfg/Lossless.dll";
+    if (FileUtil::Exists(path)) {
+        return;
+    }
+    warned = true;
+    SwitchFrontend::OverlayUI::ShowToast(
+        SwitchFrontend::OverlayTranslation::tr("settings_azahar_frame_gen_missing_dll") + " " +
+            path,
+        SwitchFrontend::OverlayUI::ToastCorner::TopRight);
+#endif
+}
+
 void ShowStateToast(const std::string& message) {
     SwitchFrontend::OverlayUI::ShowToast(message, SwitchFrontend::OverlayUI::ToastCorner::TopRight);
 }
@@ -1438,6 +1459,9 @@ int Run(int argc, char** argv) {
             overlay_init_attempted = true;
             overlay_initialized = SwitchFrontend::GameOverlay::Init(*vulkan_renderer);
             DebugLog("tico overlay init %s", overlay_initialized ? "succeeded" : "failed");
+            if (overlay_initialized) {
+                WarnIfLosslessMissing();
+            }
             if (overlay_initialized && !auto_save_offered) {
                 auto_save_offered = true;
                 if (OfferAutoSave(system)) {
@@ -1451,6 +1475,7 @@ int Run(int argc, char** argv) {
             SwitchFrontend::GameOverlay::Update(&pad);
             if (SwitchFrontend::OverlayUI::ConsumeSettingsChanged()) {
                 SwitchFrontend::TicoSettings::ApplyLive(system);
+                WarnIfLosslessMissing();
                 DebugLog("tico overlay: settings applied");
             }
             if (HandleOverlayAction(system, SwitchFrontend::GameOverlay::ConsumeAction())) {

@@ -42,6 +42,16 @@ This fork follows Azahar's existing content support boundaries:
 
 ----------
 
+## Frame Generation
+
+Settings > Graphics > Frame Generation interpolates extra frames with Lossless Scaling's frame generation, through [lsfg-vk](https://github.com/PancakeTAS/lsfg-vk), as ported to the Switch by [dekopon](https://github.com/PalindromicBreadLoaf/dekopon) (@PalindromicBreadLoaf). It turns on only for games that run at a low frame rate, which then reach the display rate.
+
+Its shaders come from Lossless Scaling itself, which is not included: copy `Lossless.dll` from your own copy of Lossless Scaling to `sdmc:/tico/system/3ds/lsfg/Lossless.dll`.
+
+lsfg-vk is GPL-3.0-or-later, so builds with frame generation (the default) are GPL-3.0-or-later as a whole. Build with `-DENABLE_LSFG=OFF` for a GPL-2.0-or-later build.
+
+----------
+
 ## Credits
 
 This port is built on top of the official Azahar emulator project.

@@ -2,6 +2,8 @@
 // Licensed under GPLv2 or any later version
 // Refer to the misc/licenses/gplv2.txt file included.
 
+#include <exception>
+
 #include "common/logging/log.h"
 #include "common/microprofile.h"
 #include "common/settings.h"
@@ -146,7 +148,8 @@ PresentWindow::PresentWindow(Frontend::EmuWindow& emu_window_, const Instance& i
       vsync_enabled{Settings::values.use_vsync.GetValue()},
       blit_supported{
           CanBlitToSwapchain(instance.GetPhysicalDevice(), swapchain.GetSurfaceFormat().format)},
-      use_present_thread{Settings::values.async_presentation.GetValue()},
+      async_presentation{Settings::values.async_presentation.GetValue()},
+      use_present_thread{async_presentation},
       last_render_surface{emu_window.GetWindowInfo().render_surface} {
 
     const u32 num_images = swapchain.GetImageCount();
@@ -159,17 +162,28 @@ PresentWindow::PresentWindow(Frontend::EmuWindow& emu_window_, const Instance& i
     };
     command_pool = device.createCommandPool(pool_info);
 
+#ifdef ENABLE_LSFG
+    constexpr u32 buffers_per_frame = 1 + kMaxGeneratedFrames;
+#else
+    constexpr u32 buffers_per_frame = 1;
+#endif
+
     const vk::CommandBufferAllocateInfo alloc_info = {
         .commandPool = command_pool,
         .level = vk::CommandBufferLevel::ePrimary,
-        .commandBufferCount = num_images,
+        .commandBufferCount = num_images * buffers_per_frame,
     };
     const std::vector command_buffers = device.allocateCommandBuffers(alloc_info);
 
     swap_chain.resize(num_images);
     for (u32 i = 0; i < num_images; i++) {
         Frame& frame = swap_chain[i];
-        frame.cmdbuf = command_buffers[i];
+        frame.cmdbuf = command_buffers[i * buffers_per_frame];
+#ifdef ENABLE_LSFG
+        for (u32 j = 0; j < kMaxGeneratedFrames; j++) {
+            frame.generated_cmdbufs[j] = command_buffers[i * buffers_per_frame + 1 + j];
+        }
+#endif
         frame.render_ready = device.createSemaphore({});
         frame.present_done = device.createFence({.flags = vk::FenceCreateFlagBits::eSignaled});
         free_queue.push(&frame);
@@ -330,10 +344,33 @@ Frame* PresentWindow::GetRenderFrame() {
 }
 
 void PresentWindow::Present(Frame* frame) {
+    bool generating = false;
+#ifdef ENABLE_LSFG
+    frame->frame_gen = VideoCore::UpdateFrameGenerationGate();
+    if (frame->frame_gen.state == VideoCore::FrameGenerationState::Active &&
+        lsfg_unavailable.load(std::memory_order_relaxed)) {
+        frame->frame_gen = {VideoCore::FrameGenerationState::Unavailable, 0};
+    }
+    generating = frame->frame_gen.state == VideoCore::FrameGenerationState::Active;
+#endif
+
+    // Generated frames are presented here, in step with the game: each one waits its turn
+    // on the display, and that is what spaces them out.
+    const bool async = async_presentation && !generating;
+    if (async != use_present_thread) {
+        WaitPresent();
+        use_present_thread = async;
+    }
+
     if (!use_present_thread) {
         scheduler.WaitWorker();
-        CopyToSwapchain(frame);
+        {
+            std::scoped_lock swapchain_lock{swapchain_mutex};
+            CopyToSwapchain(frame);
+        }
+        std::scoped_lock lock{free_mutex};
         free_queue.push(frame);
+        free_cv.notify_one();
         return;
     }
 
@@ -345,7 +382,7 @@ void PresentWindow::Present(Frame* frame) {
 }
 
 void PresentWindow::WaitPresent() {
-    if (!use_present_thread) {
+    if (!present_thread.joinable()) {
         return;
     }
 
@@ -420,52 +457,44 @@ void PresentWindow::NotifySurfaceChanged() {
 #endif
 }
 
-void PresentWindow::CopyToSwapchain(Frame* frame) {
-    const auto recreate_swapchain = [&] {
+void PresentWindow::RecreateSwapchain(u32 width, u32 height) {
 #ifdef ANDROID
-        {
-            std::unique_lock lock{recreate_surface_mutex};
-            recreate_surface_cv.wait(lock, [this]() { return surface != next_surface; });
-            surface = next_surface;
-        }
+    {
+        std::unique_lock lock{recreate_surface_mutex};
+        recreate_surface_cv.wait(lock, [this]() { return surface != next_surface; });
+        surface = next_surface;
+    }
 #endif
-        std::scoped_lock submit_lock{scheduler.submit_mutex};
-        graphics_queue.waitIdle();
+    std::scoped_lock submit_lock{scheduler.submit_mutex};
+    graphics_queue.waitIdle();
 #ifdef __SWITCH__
-        // The overlay derives image views/framebuffers from the current swapchain
-        // images; drop them before Create() destroys those images. The queue is
-        // already idle here so it is safe to destroy the derived resources.
-        if (g_overlay_reset_callback) {
-            g_overlay_reset_callback();
-        }
-#endif
-        swapchain.Create(frame->width, frame->height, surface, low_refresh_rate);
-    };
-
-#ifndef ANDROID
-    const bool use_vsync = Settings::values.use_vsync.GetValue();
-    const bool size_changed =
-        swapchain.GetWidth() != frame->width || swapchain.GetHeight() != frame->height;
-    const bool vsync_changed = vsync_enabled != use_vsync;
-    if (vsync_changed || size_changed) [[unlikely]] {
-        vsync_enabled = use_vsync;
-        recreate_swapchain();
+    // The overlay derives image views/framebuffers from the current swapchain
+    // images; drop them before Create() destroys those images. The queue is
+    // already idle here so it is safe to destroy the derived resources.
+    if (g_overlay_reset_callback) {
+        g_overlay_reset_callback();
     }
 #endif
+    swapchain.Create(width, height, surface, low_refresh_rate);
+}
 
+void PresentWindow::AcquireSwapchainImage(u32 width, u32 height) {
     while (!swapchain.AcquireNextImage()) {
-        recreate_swapchain();
+        RecreateSwapchain(width, height);
     }
+}
 
+void PresentWindow::RecordBlitToSwapchain(vk::CommandBuffer cmdbuf, const BlitSource& source) {
     const vk::Image swapchain_image = swapchain.Image();
-
-    const vk::CommandBufferBeginInfo begin_info = {
-        .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-    };
-    const vk::CommandBuffer cmdbuf = frame->cmdbuf;
-    cmdbuf.begin(begin_info);
-
     const vk::Extent2D extent = swapchain.GetExtent();
+    const vk::ImageSubresourceRange subresource_range{
+        .aspectMask = vk::ImageAspectFlagBits::eColor,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    };
+
     const std::array pre_barriers{
         vk::ImageMemoryBarrier{
             .srcAccessMask = vk::AccessFlagBits::eNone,
@@ -475,29 +504,17 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = swapchain_image,
-            .subresourceRange{
-                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = VK_REMAINING_ARRAY_LAYERS,
-            },
+            .subresourceRange = subresource_range,
         },
         vk::ImageMemoryBarrier{
-            .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+            .srcAccessMask = source.access,
             .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-            .oldLayout = vk::ImageLayout::eTransferSrcOptimal,
+            .oldLayout = source.layout,
             .newLayout = vk::ImageLayout::eTransferSrcOptimal,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = frame->image,
-            .subresourceRange{
-                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = VK_REMAINING_ARRAY_LAYERS,
-            },
+            .image = source.image,
+            .subresourceRange = subresource_range,
         },
     };
 #ifdef __SWITCH__
@@ -508,45 +525,53 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
 #else
     constexpr bool draw_overlay = false;
 #endif
-    const vk::ImageLayout post_blit_layout =
-        draw_overlay ? vk::ImageLayout::eColorAttachmentOptimal : vk::ImageLayout::ePresentSrcKHR;
-    const vk::ImageMemoryBarrier post_barrier{
-        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-        .dstAccessMask = vk::AccessFlagBits::eMemoryRead |
-                         vk::AccessFlagBits::eColorAttachmentWrite,
-        .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-        .newLayout = post_blit_layout,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = swapchain_image,
-        .subresourceRange{
-            .aspectMask = vk::ImageAspectFlagBits::eColor,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    const std::array post_barriers{
+        vk::ImageMemoryBarrier{
+            .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+            .dstAccessMask = vk::AccessFlagBits::eMemoryRead |
+                             vk::AccessFlagBits::eColorAttachmentWrite,
+            .oldLayout = vk::ImageLayout::eTransferDstOptimal,
+            .newLayout = draw_overlay ? vk::ImageLayout::eColorAttachmentOptimal
+                                      : vk::ImageLayout::ePresentSrcKHR,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = swapchain_image,
+            .subresourceRange = subresource_range,
+        },
+        // a source kept in another layout goes back to it
+        vk::ImageMemoryBarrier{
+            .srcAccessMask = vk::AccessFlagBits::eTransferRead,
+            .dstAccessMask = source.access,
+            .oldLayout = vk::ImageLayout::eTransferSrcOptimal,
+            .newLayout = source.layout,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = source.image,
+            .subresourceRange = subresource_range,
         },
     };
+    const u32 post_barrier_count =
+        source.layout == vk::ImageLayout::eTransferSrcOptimal ? 1u : 2u;
 
-    cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                           vk::PipelineStageFlagBits::eTransfer, vk::DependencyFlagBits::eByRegion,
-                           {}, {}, pre_barriers);
+    cmdbuf.pipelineBarrier(source.stage, vk::PipelineStageFlagBits::eTransfer,
+                           vk::DependencyFlagBits::eByRegion, {}, {}, pre_barriers);
 
     if (blit_supported) {
-        cmdbuf.blitImage(frame->image, vk::ImageLayout::eTransferSrcOptimal, swapchain_image,
+        cmdbuf.blitImage(source.image, vk::ImageLayout::eTransferSrcOptimal, swapchain_image,
                          vk::ImageLayout::eTransferDstOptimal,
-                         MakeImageBlit(frame->width, frame->height, extent.width, extent.height),
+                         MakeImageBlit(source.width, source.height, extent.width, extent.height),
                          Settings::values.filter_mode.GetValue() ? vk::Filter::eLinear
                                                                  : vk::Filter::eNearest);
     } else {
-        cmdbuf.copyImage(frame->image, vk::ImageLayout::eTransferSrcOptimal, swapchain_image,
+        cmdbuf.copyImage(source.image, vk::ImageLayout::eTransferSrcOptimal, swapchain_image,
                          vk::ImageLayout::eTransferDstOptimal,
-                         MakeImageCopy(frame->width, frame->height, extent.width, extent.height));
+                         MakeImageCopy(source.width, source.height, extent.width, extent.height));
     }
 
-    cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
-                           vk::PipelineStageFlagBits::eAllCommands,
-                           vk::DependencyFlagBits::eByRegion, {}, {}, post_barrier);
+    cmdbuf.pipelineBarrier(
+        vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands,
+        vk::DependencyFlagBits::eByRegion, {}, {},
+        vk::ArrayProxy<const vk::ImageMemoryBarrier>{post_barrier_count, post_barriers.data()});
 
 #ifdef __SWITCH__
     if (draw_overlay) {
@@ -561,33 +586,27 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .image = swapchain_image,
-            .subresourceRange{
-                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = VK_REMAINING_ARRAY_LAYERS,
-            },
+            .subresourceRange = subresource_range,
         };
         cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
                                vk::PipelineStageFlagBits::eBottomOfPipe,
                                vk::DependencyFlagBits::eByRegion, {}, {}, present_barrier);
     }
 #endif
+}
 
-    cmdbuf.end();
-
+void PresentWindow::SubmitAndPresent(vk::CommandBuffer cmdbuf, vk::Semaphore render_ready,
+                                     vk::Fence fence) {
     static constexpr std::array<vk::PipelineStageFlags, 2> wait_stage_masks = {
         vk::PipelineStageFlagBits::eColorAttachmentOutput,
         vk::PipelineStageFlagBits::eAllGraphics,
     };
 
     const vk::Semaphore present_ready = swapchain.GetPresentReadySemaphore();
-    const vk::Semaphore image_acquired = swapchain.GetImageAcquiredSemaphore();
-    const std::array wait_semaphores = {image_acquired, frame->render_ready};
+    const std::array wait_semaphores = {swapchain.GetImageAcquiredSemaphore(), render_ready};
 
-    vk::SubmitInfo submit_info = {
-        .waitSemaphoreCount = static_cast<u32>(wait_semaphores.size()),
+    const vk::SubmitInfo submit_info = {
+        .waitSemaphoreCount = render_ready ? 2u : 1u,
         .pWaitSemaphores = wait_semaphores.data(),
         .pWaitDstStageMask = wait_stage_masks.data(),
         .commandBufferCount = 1u,
@@ -599,13 +618,195 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
     std::scoped_lock submit_lock{scheduler.submit_mutex, recreate_surface_mutex};
 
     try {
-        graphics_queue.submit(submit_info, frame->present_done);
+        graphics_queue.submit(submit_info, fence);
     } catch (vk::DeviceLostError& err) {
         LOG_CRITICAL(Render_Vulkan, "Device lost during present submit: {}", err.what());
         UNREACHABLE();
     }
 
     swapchain.Present();
+}
+
+#ifdef ENABLE_LSFG
+void PresentWindow::ResetFrameGeneration() {
+    if (!lsfg_bridge) {
+        return;
+    }
+    std::scoped_lock submit_lock{scheduler.submit_mutex};
+    lsfg_bridge.reset();
+}
+
+void PresentWindow::UpdateFrameGeneration(Frame* frame) {
+    using VideoCore::FrameGenerationState;
+
+    if (frame->frame_gen.state == FrameGenerationState::Off) {
+        ResetFrameGeneration();
+        lsfg_attempted = false;
+        lsfg_unavailable.store(false, std::memory_order_relaxed);
+        VideoCore::PublishFrameGenerationDecision(frame->frame_gen);
+        return;
+    }
+
+    const LsfgConfig config{
+        .width = frame->width,
+        .height = frame->height,
+        .multiplier = frame->frame_gen.multiplier,
+        .flow_scale = Settings::values.frame_generation_flow_scale.GetValue(),
+        .performance_mode = Settings::values.frame_generation_performance_mode.GetValue(),
+    };
+
+    if (frame->frame_gen.state == FrameGenerationState::Unavailable) {
+        if (lsfg_config != config) {
+            lsfg_attempted = false;
+            lsfg_unavailable.store(false, std::memory_order_relaxed);
+        }
+        VideoCore::PublishFrameGenerationDecision(frame->frame_gen);
+        return;
+    }
+
+    if (frame->frame_gen.state != FrameGenerationState::Active) {
+        if (lsfg_bridge) {
+            lsfg_bridge->ResetHistory();
+        }
+        VideoCore::PublishFrameGenerationDecision(frame->frame_gen);
+        return;
+    }
+
+    if (lsfg_attempted && lsfg_config == config) {
+        if (!lsfg_bridge) {
+            frame->frame_gen = {FrameGenerationState::Unavailable, 0};
+        }
+        VideoCore::PublishFrameGenerationDecision(frame->frame_gen);
+        return;
+    }
+
+    ResetFrameGeneration();
+    lsfg_attempted = true;
+    lsfg_config = config;
+
+    const vk::Format format = swapchain.GetSurfaceFormat().format;
+    if (format != vk::Format::eR8G8B8A8Unorm) {
+        LOG_WARNING(Render_Vulkan,
+                    "Frame generation runs on R8G8B8A8_UNORM but the swapchain is {}",
+                    vk::to_string(format));
+    }
+
+    const LsfgBridgeInfo info{
+        .instance = instance.GetInstance(),
+        .physical_device = instance.GetPhysicalDevice(),
+        .device = instance.GetDevice(),
+        .queue = graphics_queue,
+        .queue_family_index = instance.GetGraphicsQueueFamilyIndex(),
+        .width = config.width,
+        .height = config.height,
+        .generated_frames = config.multiplier - 1,
+        .flow_scale = static_cast<float>(config.flow_scale) / 100.0f,
+        .performance_mode = config.performance_mode,
+    };
+
+    {
+        std::scoped_lock submit_lock{scheduler.submit_mutex};
+        lsfg_bridge = CreateLsfgBridge(info);
+    }
+
+    lsfg_unavailable.store(lsfg_bridge == nullptr, std::memory_order_relaxed);
+    if (!lsfg_bridge) {
+        frame->frame_gen = {FrameGenerationState::Unavailable, 0};
+    }
+    VideoCore::PublishFrameGenerationDecision(frame->frame_gen);
+}
+
+bool PresentWindow::CopyToSwapchainGenerated(Frame* frame) {
+    std::array<VkImage, kMaxGeneratedFrames> generated{};
+    u32 generated_count = 0;
+    try {
+        std::scoped_lock submit_lock{scheduler.submit_mutex};
+        generated_count = lsfg_bridge->RecordFrame(frame->image, frame->render_ready, generated);
+    } catch (const std::exception& e) {
+        LOG_ERROR(Render_Vulkan, "Frame generation failed: {}", e.what());
+        ResetFrameGeneration();
+        lsfg_unavailable.store(true, std::memory_order_relaxed);
+        VideoCore::PublishFrameGenerationDecision(
+            {VideoCore::FrameGenerationState::Unavailable, 0});
+        return false;
+    }
+
+    // the capture above already waited for the frame to render
+    const auto blit_and_present = [&](vk::CommandBuffer cmdbuf, const BlitSource& source,
+                                      vk::Fence fence) {
+        AcquireSwapchainImage(frame->width, frame->height);
+        cmdbuf.begin(vk::CommandBufferBeginInfo{
+            .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        });
+        RecordBlitToSwapchain(cmdbuf, source);
+        cmdbuf.end();
+        SubmitAndPresent(cmdbuf, VK_NULL_HANDLE, fence);
+    };
+
+    for (u32 i = 0; i < generated_count; i++) {
+        blit_and_present(frame->generated_cmdbufs[i],
+                         BlitSource{
+                             .image = vk::Image{generated[i]},
+                             .width = frame->width,
+                             .height = frame->height,
+                             .layout = vk::ImageLayout::eGeneral,
+                             .access = vk::AccessFlagBits::eShaderWrite,
+                             .stage = vk::PipelineStageFlagBits::eComputeShader,
+                         },
+                         VK_NULL_HANDLE);
+    }
+
+    blit_and_present(frame->cmdbuf,
+                     BlitSource{
+                         .image = frame->image,
+                         .width = frame->width,
+                         .height = frame->height,
+                         .layout = vk::ImageLayout::eTransferSrcOptimal,
+                         .access = vk::AccessFlagBits::eMemoryRead,
+                         .stage = vk::PipelineStageFlagBits::eAllCommands,
+                     },
+                     frame->present_done);
+    return true;
+}
+#endif
+
+void PresentWindow::CopyToSwapchain(Frame* frame) {
+#ifndef ANDROID
+    const bool use_vsync = Settings::values.use_vsync.GetValue();
+    const bool size_changed =
+        swapchain.GetWidth() != frame->width || swapchain.GetHeight() != frame->height;
+    const bool vsync_changed = vsync_enabled != use_vsync;
+    if (vsync_changed || size_changed) [[unlikely]] {
+        vsync_enabled = use_vsync;
+        RecreateSwapchain(frame->width, frame->height);
+    }
+#endif
+
+#ifdef ENABLE_LSFG
+    UpdateFrameGeneration(frame);
+    if (frame->frame_gen.state == VideoCore::FrameGenerationState::Active &&
+        CopyToSwapchainGenerated(frame)) {
+        return;
+    }
+#endif
+
+    AcquireSwapchainImage(frame->width, frame->height);
+
+    const vk::CommandBuffer cmdbuf = frame->cmdbuf;
+    cmdbuf.begin(vk::CommandBufferBeginInfo{
+        .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+    });
+    RecordBlitToSwapchain(cmdbuf, BlitSource{
+                                      .image = frame->image,
+                                      .width = frame->width,
+                                      .height = frame->height,
+                                      .layout = vk::ImageLayout::eTransferSrcOptimal,
+                                      .access = vk::AccessFlagBits::eColorAttachmentWrite,
+                                      .stage = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                                  });
+    cmdbuf.end();
+
+    SubmitAndPresent(cmdbuf, frame->render_ready, frame->present_done);
 }
 
 vk::RenderPass PresentWindow::CreateRenderpass() {

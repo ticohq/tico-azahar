@@ -438,6 +438,79 @@
           ]
         },
         {
+          "title": "settings_azahar_frame_generation",
+          "options": [
+            {
+              "key": "azahar_frame_gen",
+              "label": "settings_azahar_frame_gen",
+              "type": "bool",
+              "default": "false"
+            },
+            {
+              "key": "azahar_frame_gen_multiplier",
+              "label": "settings_azahar_frame_gen_multiplier",
+              "type": "enum",
+              "default": "2",
+              "choices": [
+                {
+                  "label": "2x",
+                  "value": "2"
+                },
+                {
+                  "label": "3x",
+                  "value": "3"
+                },
+                {
+                  "label": "4x",
+                  "value": "4"
+                }
+              ],
+              "depends_on": {
+                "key": "azahar_frame_gen",
+                "value": "true"
+              }
+            },
+            {
+              "key": "azahar_frame_gen_flow_scale",
+              "label": "settings_azahar_frame_gen_flow_scale",
+              "type": "enum",
+              "default": "25",
+              "choices": [
+                {
+                  "label": "25%",
+                  "value": "25"
+                },
+                {
+                  "label": "50%",
+                  "value": "50"
+                },
+                {
+                  "label": "75%",
+                  "value": "75"
+                },
+                {
+                  "label": "100%",
+                  "value": "100"
+                }
+              ],
+              "depends_on": {
+                "key": "azahar_frame_gen",
+                "value": "true"
+              }
+            },
+            {
+              "key": "azahar_frame_gen_performance",
+              "label": "settings_azahar_frame_gen_performance",
+              "type": "bool",
+              "default": "true",
+              "depends_on": {
+                "key": "azahar_frame_gen",
+                "value": "true"
+              }
+            }
+          ]
+        },
+        {
           "title": "settings_azahar_hacks",
           "options": [
             {

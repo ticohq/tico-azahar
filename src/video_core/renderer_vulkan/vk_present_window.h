@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -11,6 +12,10 @@
 #include <queue>
 #include "common/polyfill_thread.h"
 #include "video_core/renderer_vulkan/vk_swapchain.h"
+#ifdef ENABLE_LSFG
+#include "video_core/frame_generation.h"
+#include "video_core/renderer_vulkan/vk_lsfg.h"
+#endif
 
 VK_DEFINE_HANDLE(VmaAllocation)
 
@@ -54,6 +59,11 @@ struct Frame {
     vk::Semaphore render_ready;
     vk::Fence present_done;
     vk::CommandBuffer cmdbuf;
+#ifdef ENABLE_LSFG
+    // one per generated frame, presented ahead of this one
+    std::array<vk::CommandBuffer, kMaxGeneratedFrames> generated_cmdbufs;
+    VideoCore::FrameGenerationDecision frame_gen;
+#endif
 };
 
 class PresentWindow final {
@@ -92,7 +102,35 @@ public:
 private:
     void PresentThread(std::stop_token token);
 
+    void RecreateSwapchain(u32 width, u32 height);
+
+    void AcquireSwapchainImage(u32 width, u32 height);
+
+    struct BlitSource {
+        vk::Image image;
+        u32 width;
+        u32 height;
+        vk::ImageLayout layout;
+        vk::AccessFlags access;
+        vk::PipelineStageFlags stage;
+    };
+
+    /// Blits `source` into the acquired swapchain image, draws the overlay over it and leaves
+    /// it ready to present.
+    void RecordBlitToSwapchain(vk::CommandBuffer cmdbuf, const BlitSource& source);
+
+    void SubmitAndPresent(vk::CommandBuffer cmdbuf, vk::Semaphore render_ready, vk::Fence fence);
+
     void CopyToSwapchain(Frame* frame);
+
+#ifdef ENABLE_LSFG
+    void ResetFrameGeneration();
+
+    void UpdateFrameGeneration(Frame* frame);
+
+    /// Presents the generated frames, then the frame itself; false when generation failed.
+    bool CopyToSwapchainGenerated(Frame* frame);
+#endif
 
     vk::RenderPass CreateRenderpass();
 
@@ -120,8 +158,24 @@ private:
     std::jthread present_thread;
     bool vsync_enabled{};
     bool blit_supported;
-    bool use_present_thread{true};
+    bool async_presentation{true};
+    std::atomic<bool> use_present_thread{true};
     void* last_render_surface{};
+#ifdef ENABLE_LSFG
+    LsfgBridgePtr lsfg_bridge;
+    struct LsfgConfig {
+        u32 width;
+        u32 height;
+        u32 multiplier;
+        u32 flow_scale;
+        bool performance_mode;
+
+        bool operator==(const LsfgConfig&) const = default;
+    };
+    LsfgConfig lsfg_config{};
+    bool lsfg_attempted{};
+    std::atomic<bool> lsfg_unavailable{};
+#endif
 };
 
 } // namespace Vulkan

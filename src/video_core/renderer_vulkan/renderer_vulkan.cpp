@@ -279,8 +279,13 @@ void RendererVulkan::PrepareDraw(Frame* frame, const Layout::FramebufferLayout& 
 
 void RendererVulkan::RenderToWindow(PresentWindow& window, const Layout::FramebufferLayout& layout,
                                     bool flipped, bool force_present) {
-    if (force_present || !Settings::values.use_skip_duplicate_frames.GetValue() ||
-        Core::PerfStats::game_frames_updated) {
+    // frame generation interpolates between distinct frames, so it never repeats one
+    const bool skip_duplicates = Settings::values.use_skip_duplicate_frames.GetValue()
+#ifdef ENABLE_LSFG
+                                 || Settings::values.use_frame_generation.GetValue()
+#endif
+        ;
+    if (force_present || !skip_duplicates || Core::PerfStats::game_frames_updated) {
         Frame* frame = window.GetRenderFrame();
 
         if (layout.width != frame->width || layout.height != frame->height) {

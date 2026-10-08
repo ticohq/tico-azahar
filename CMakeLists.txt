@@ -145,6 +145,9 @@ CMAKE_DEPENDENT_OPTION(ENABLE_LIBUSB "Enable libusb for GameCube Adapter support
 
 CMAKE_DEPENDENT_OPTION(ENABLE_FFMPEG "Enable features which require FFmpeg to function" ON "ENABLE_QT" OFF)
 
+# Frame generation (Lossless Scaling's interpolation, through lsfg-vk). lsfg-vk is
+# GPL-3.0-or-later, so a build with it is too; -DENABLE_LSFG=OFF keeps GPL-2.0-or-later.
+CMAKE_DEPENDENT_OPTION(ENABLE_LSFG "Enables LSFG frame generation" ON "SWITCH AND ENABLE_VULKAN" OFF)
 CMAKE_DEPENDENT_OPTION(ENABLE_SOFTWARE_RENDERER "Enables the software renderer" ON "NOT ANDROID" OFF)
 CMAKE_DEPENDENT_OPTION(ENABLE_OPENGL "Enables the OpenGL renderer" ${DEFAULT_ENABLE_OPENGL} "NOT APPLE" OFF)
 # NetBSD doesn't support Vulkan yet, remove this check when it does.
@@ -223,6 +226,9 @@ if (ENABLE_ROOM)
 endif()
 if (ENABLE_SDL2)
     add_definitions(-DENABLE_SDL2)
+endif()
+if (ENABLE_LSFG)
+    add_definitions(-DENABLE_LSFG)
 endif()
 
 if(ENABLE_SSE42 AND (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64"))

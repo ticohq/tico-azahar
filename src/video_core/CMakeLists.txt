@@ -9,6 +9,8 @@ add_library(video_core STATIC EXCLUDE_FROM_ALL
     custom_textures/material.h
     debug_utils/debug_utils.cpp
     debug_utils/debug_utils.h
+    frame_generation.cpp
+    frame_generation.h
     gpu.cpp
     gpu.h
     gpu_debugger.h
@@ -205,6 +207,13 @@ if (ENABLE_VULKAN)
         shader/generator/spv_fs_shader_gen.h
     )
     target_link_libraries(video_core PRIVATE vulkan-headers vma sirit SPIRV glslang)
+    if (ENABLE_LSFG)
+        target_sources(video_core PRIVATE
+            renderer_vulkan/vk_lsfg.cpp
+            renderer_vulkan/vk_lsfg.h
+        )
+        target_link_libraries(video_core PRIVATE lsfg-vk)
+    endif()
 endif()
 
 if(ENABLE_SDL2)
