@@ -142,6 +142,8 @@
     "settings_azahar_map_zr": "ZR Button",
     "settings_azahar_mic_input": "Microphone Input",
     "settings_azahar_microphone": "Microphone",
+    "settings_azahar_movie_clock": "CPU Clock During Movies",
+    "settings_azahar_movie_throttle": "Slower CPU During Movies",
     "settings_azahar_new_3ds": "New 3DS",
     "settings_azahar_orientation": "Orientation",
     "settings_azahar_output": "Output",

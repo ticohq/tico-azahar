@@ -22,6 +22,7 @@
 #include "video_core/gpu.h"
 #include "core/hle/service/cfg/cfg.h"
 #include "overlay/tico_config.h"
+#include "tico/movie_throttle.h"
 #include "tico/switch_libnx.h"
 
 namespace SwitchFrontend::TicoSettings {
@@ -316,6 +317,8 @@ void ApplyLiveValues(const Values& values) {
     Settings::values.skip_slow_draw.SetValue(GetBool(values, "azahar_skip_slow_draw"));
     Settings::values.skip_texture_copy.SetValue(GetBool(values, "azahar_skip_texture_copy"));
     Settings::values.skip_cpu_write.SetValue(GetBool(values, "azahar_skip_cpu_write"));
+    MovieThrottle::Configure(GetBool(values, "azahar_movie_throttle"),
+                             GetInt(values, "azahar_movie_clock").value_or(45));
     Settings::values.simulate_3ds_gpu_timings.SetValue(
         GetBool(values, "azahar_simulate_gpu_timings"));
     Settings::values.disable_right_eye_render.SetValue(!GetBool(values, "azahar_right_eye"));
@@ -381,6 +384,7 @@ void ApplyLive(Core::System& system) {
     system.GPU().WaitIdle();
     ApplyLiveValues(CurrentValues());
     system.ApplySettings();
+    MovieThrottle::Reapply(system);
 }
 
 void ApplyProfile(Core::System& system) {

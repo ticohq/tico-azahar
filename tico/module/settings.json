@@ -457,6 +457,48 @@
               "label": "settings_azahar_skip_cpu_write",
               "type": "bool",
               "default": "false"
+            },
+            {
+              "key": "azahar_movie_throttle",
+              "label": "settings_azahar_movie_throttle",
+              "type": "bool",
+              "default": "false"
+            },
+            {
+              "key": "azahar_movie_clock",
+              "label": "settings_azahar_movie_clock",
+              "type": "enum",
+              "default": "45",
+              "choices": [
+                {
+                  "label": "25%",
+                  "value": "25"
+                },
+                {
+                  "label": "35%",
+                  "value": "35"
+                },
+                {
+                  "label": "45%",
+                  "value": "45"
+                },
+                {
+                  "label": "55%",
+                  "value": "55"
+                },
+                {
+                  "label": "65%",
+                  "value": "65"
+                },
+                {
+                  "label": "75%",
+                  "value": "75"
+                }
+              ],
+              "depends_on": {
+                "key": "azahar_movie_throttle",
+                "value": "true"
+              }
             }
           ]
         }

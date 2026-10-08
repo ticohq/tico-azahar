@@ -79,6 +79,12 @@ STRINGS = {
                        "Omitir escrituras pequeñas de la CPU", "Ignorer les petites écritures CPU",
                        "小さなCPU書き込みをスキップ", "Pular pequenas escritas da CPU",
                        "Пропускать мелкие записи CPU", "跳过小型CPU写入"),
+    "movie_throttle": ("Slower CPU During Movies", "Langsamere CPU bei Videos", "CPU más lenta en vídeos",
+                       "CPU ralenti pendant les vidéos", "ムービー中はCPUを低速化", "CPU mais lenta em vídeos",
+                       "Замедлять CPU в видеороликах", "播放影片时降低CPU"),
+    "movie_clock": ("CPU Clock During Movies", "CPU-Takt bei Videos", "Reloj de CPU en vídeos",
+                    "Horloge CPU pendant les vidéos", "ムービー中のCPUクロック", "Clock da CPU em vídeos",
+                    "Частота CPU в видеороликах", "影片时CPU频率"),
     "vsync": ("VSync", "VSync", "VSync", "VSync", "垂直同期", "VSync", "Вертикальная синхронизация", "垂直同步"),
     "simulate_gpu_timings": ("Simulate 3DS GPU Timings", "3DS-GPU-Timings simulieren", "Simular tiempos de GPU de 3DS", "Simuler les délais du GPU 3DS", "3DSのGPUタイミングを再現", "Simular tempos da GPU do 3DS", "Имитировать тайминги GPU 3DS", "模拟 3DS GPU 时序"),
     "right_eye": ("Right Eye Rendering", "Rechtes Auge rendern", "Renderizar ojo derecho", "Rendu de l'œil droit", "右目の描画", "Renderizar olho direito", "Рендер правого глаза", "渲染右眼"),
@@ -199,6 +205,7 @@ LANGUAGES_3DS = same("Japanese", "English", "French", "German", "Italian", "Span
                      "Traditional Chinese")
 CPU_CLOCKS = choices(*((f"{p}%", str(p)) for p in (25, 50, 75, 100, 125, 150, 175, 200, 250, 300,
                                                     350, 400)))
+MOVIE_CLOCKS = choices(*((f"{p}%", str(p)) for p in (25, 35, 45, 55, 65, 75)))
 RESOLUTIONS = choices(("Native", "1"), *((f"{n}x", str(n)) for n in range(2, 11)))
 PROPORTIONS = choices(*((f"{v:.2f}", f"{v:.2f}") for v in [1.0 + 0.5 * i for i in range(11)]))
 VOLUMES = choices(*((f"{v}%", str(v)) for v in range(0, 101, 10)))
@@ -264,6 +271,9 @@ TABS = [
             option("skip_slow_draw", "skip_slow_draw", "bool", "false"),
             option("skip_texture_copy", "skip_texture_copy", "bool", "false"),
             option("skip_cpu_write", "skip_cpu_write", "bool", "false"),
+            option("movie_throttle", "movie_throttle", "bool", "false"),
+            option("movie_clock", "movie_clock", "enum", "45", choices=MOVIE_CLOCKS,
+                   depends_on=OrderedDict(key="azahar_movie_throttle", value="true")),
         ]),
     ]),
     ("screen", [

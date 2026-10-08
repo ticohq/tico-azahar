@@ -16,6 +16,8 @@ add_executable(tico
     library_screen.cpp
     library_screen.h
     main.cpp
+    movie_throttle.cpp
+    movie_throttle.h
     overlay_renderer.cpp
     saves.cpp
     saves.h

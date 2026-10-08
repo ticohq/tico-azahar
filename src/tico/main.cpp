@@ -38,6 +38,7 @@
 #include "tico/emu_window_switch.h"
 #include "tico/game_overlay.h"
 #include "tico/library_screen.h"
+#include "tico/movie_throttle.h"
 #include "tico/saves.h"
 #include "tico/switch_keyboard.h"
 #include "tico/tico_settings.h"
@@ -1341,6 +1342,7 @@ int Run(int argc, char** argv) {
     StartupLog("Run: frontend applets/image interface");
     system.RegisterImageInterface(std::make_shared<Frontend::ImageInterface>());
     Frontend::RegisterDefaultApplets(system);
+    SwitchFrontend::MovieThrottle::Register(system);
     system.RegisterSoftwareKeyboard(std::make_shared<SwitchFrontend::SwitchKeyboard>());
 
     StartupLog("Run: creating NWindow frontend");
