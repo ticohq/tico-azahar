@@ -1355,7 +1355,7 @@ void RendererVulkan::DrawCursor(const Layout::FramebufferLayout& layout) {
     const float buf_h = static_cast<float>(layout.height);
 
     // Convert from bottom-screen-local to layout-absolute. The hand cursor is based on
-    // src/tico/assets/mouse.svg, with the fingertip aligned to the touch coordinate.
+    // tico/assets/mouse.svg, with the fingertip aligned to the touch coordinate.
     const float abs_x = layout.bottom_screen.left + cursor.projected_x;
     const float abs_y = layout.bottom_screen.top + cursor.projected_y;
 

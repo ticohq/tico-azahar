@@ -1,0 +1,37 @@
+{
+  "id": "azahar",
+  "name": "Azahar",
+  "nro": "tico-azahar.nro",
+  "launch": "\"{nro}\" \"{rom}\" \"{title}\"",
+  "settings": "config/modules/azahar/settings.json",
+  "config_file": "azahar.jsonc",
+  "is_libretro": false,
+  "bool_true_value": "true",
+  "bool_false_value": "false",
+  "systems": [
+    {
+      "slug": "3ds",
+      "title": "Nintendo 3DS",
+      "short_title": "3DS",
+      "extensions": [
+        ".3ds",
+        ".3dsx",
+        ".z3dsx",
+        ".elf",
+        ".axf",
+        ".cci",
+        ".zcci",
+        ".cxi",
+        ".zcxi",
+        ".app"
+      ],
+      "games_file": "3ds.json",
+      "colors": {
+        "start": "5FAFE6",
+        "end": "4A7DE0",
+        "start_dark": "3F7FA8",
+        "end_dark": "3459A8"
+      }
+    }
+  ]
+}

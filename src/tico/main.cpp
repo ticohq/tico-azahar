@@ -25,11 +25,14 @@
 
 #include "audio_core/input_details.h"
 #include "audio_core/sink_details.h"
+#include "UsbStorage.h"
+#include "overlay/overlay_ui.h"
+#include "overlay/tico_config.h"
+#include "overlay/translation_manager.h"
 #include "tico/emu_window_switch.h"
-#include "tico/overlay/overlay_ui.h"
-#include "tico/overlay/tico_config.h"
-#include "tico/overlay/vulkan_overlay.h"
+#include "tico/game_overlay.h"
 #include "tico/switch_keyboard.h"
+#include "tico/tico_settings.h"
 #include "common/file_util.h"
 #include "common/logging/backend.h"
 #include "common/param_package.h"
@@ -255,10 +258,23 @@ void DebugLog(const char* fmt, ...) {
     va_end(args);
 }
 
+// Restart: the NRO starts itself again with the arguments it was given
+bool relaunch = false;
+std::vector<std::string> launch_args;
+
 bool QueueTicoReturn() {
+    UsbStorage::Shutdown(); // flush and unmount before tico takes over again
     if (!envHasNextLoad()) {
         StartupLog("QueueTicoReturn: loader does not support envSetNextLoad");
         return false;
+    }
+
+    if (relaunch && !launch_args.empty()) {
+        std::string args;
+        for (const std::string& arg : launch_args) {
+            args += (args.empty() ? "\"" : " \"") + arg + "\"";
+        }
+        return envSetNextLoad(launch_args.front().c_str(), args.c_str()) == 0;
     }
 
     const char* target = nullptr;
@@ -792,7 +808,7 @@ void ToggleSwapScreens() {
     const bool current = Settings::values.swap_screen.GetValue();
     const bool next = !current;
     Settings::values.swap_screen.SetValue(next);
-    SwitchFrontend::TicoConfig::SetConfigValue("swap_screens", next ? "true" : "false");
+    SwitchFrontend::TicoConfig::SetConfigValue("azahar_swap_screens", next ? "true" : "false");
     SwitchFrontend::TicoConfig::SaveConfig();
     DebugLog("swap screens toggled: %d -> %d", current ? 1 : 0, next ? 1 : 0);
     SwitchFrontend::OverlayUI::ShowToast(next ? "Screens swapped" : "Screens normal",
@@ -964,135 +980,84 @@ void ConfigureOverlay(Core::System& system, const std::string& display_title) {
         });
 }
 
+// A text setting (e.g. the console's name): the system keyboard, filled in with its value.
+void EditTextOption() {
+    namespace OverlayUI = SwitchFrontend::OverlayUI;
+    const auto* option = OverlayUI::ConsumeTextEditOption();
+    if (!option) {
+        return;
+    }
+    SwkbdConfig keyboard;
+    if (R_FAILED(swkbdCreate(&keyboard, 0))) {
+        return;
+    }
+    const std::string current = SwitchFrontend::TicoConfig::GetOptionValue(*option);
+    const std::string title = SwitchFrontend::OverlayTranslation::tr(option->label_key);
+    swkbdConfigMakePresetDefault(&keyboard);
+    swkbdConfigSetInitialText(&keyboard, current.c_str());
+    swkbdConfigSetGuideText(&keyboard, title.c_str());
+    if (option->max_length > 0) {
+        swkbdConfigSetStringLenMax(&keyboard, static_cast<u32>(option->max_length));
+    }
+    char typed[512] = {};
+    if (R_SUCCEEDED(swkbdShow(&keyboard, typed, sizeof(typed)))) {
+        SwitchFrontend::TicoConfig::SetOptionValue(*option, typed);
+        OverlayUI::NotifyOptionEdited(*option);
+    }
+    swkbdClose(&keyboard);
+}
+
+// Returns true when the renderer is made again (a state loaded, a reset) and the
+// overlay has to start again.
 bool HandleOverlayAction(Core::System& system, SwitchFrontend::OverlayUI::Action action) {
-    using SwitchFrontend::OverlayUI::Action;
+    namespace OverlayUI = SwitchFrontend::OverlayUI;
+    namespace GameOverlay = SwitchFrontend::GameOverlay;
+    using OverlayUI::Action;
 
-    if (action == Action::None) {
-        return false;
-    }
-    if (action == Action::Exit || SwitchFrontend::VulkanOverlay::ShouldExit()) {
-        DebugLog("overlay requested exit");
-        system.RequestShutdown();
-        return false;
-    }
-
-    const int slot = SwitchFrontend::OverlayUI::GetStateSlotForAction(action);
-    if (slot <= 0) {
-        return false;
-    }
-
-    if (SwitchFrontend::OverlayUI::IsSaveStateAction(action)) {
+    if (OverlayUI::IsSaveStateAction(action)) {
+        const int slot = OverlayUI::GetStateSlotForAction(action);
         DebugLog("overlay requested save state slot %d", slot);
+        GameOverlay::SetVisible(false);
         SaveStateFromOverlay(system, static_cast<u32>(slot));
-    } else if (SwitchFrontend::OverlayUI::IsLoadStateAction(action)) {
+        return false;
+    }
+    if (OverlayUI::IsLoadStateAction(action)) {
+        const int slot = OverlayUI::GetStateSlotForAction(action);
         DebugLog("overlay requested load state slot %d", slot);
-        SwitchFrontend::VulkanOverlay::Shutdown();
+        GameOverlay::Shutdown();
         LoadStateFromOverlay(system, static_cast<u32>(slot));
         return true;
     }
-    return false;
-}
 
-std::string LowerCopy(std::string_view value) {
-    std::string out(value);
-    std::transform(out.begin(), out.end(), out.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return out;
-}
-
-bool TryParseSystemLanguage(std::string_view value, Service::CFG::SystemLanguage& language) {
-    const std::string lower = LowerCopy(value);
-    if (lower == "japanese" || lower == "jp" || lower == "ja" || lower == "0") {
-        language = Service::CFG::LANGUAGE_JP;
+    switch (action) {
+    case Action::Exit:
+        DebugLog("overlay requested exit");
+        GameOverlay::SetVisible(false);
+        system.RequestShutdown();
+        break;
+    case Action::Restart:
+        DebugLog("overlay requested restart");
+        GameOverlay::SetVisible(false);
+        relaunch = true;
+        system.RequestShutdown();
+        break;
+    case Action::Reset:
+        // the system is built again, renderer included
+        DebugLog("overlay requested reset");
+        GameOverlay::Shutdown();
+        system.RequestReset();
         return true;
-    }
-    if (lower == "english" || lower == "en" || lower == "1") {
-        language = Service::CFG::LANGUAGE_EN;
-        return true;
-    }
-    if (lower == "french" || lower == "fr" || lower == "2") {
-        language = Service::CFG::LANGUAGE_FR;
-        return true;
-    }
-    if (lower == "german" || lower == "de" || lower == "3") {
-        language = Service::CFG::LANGUAGE_DE;
-        return true;
-    }
-    if (lower == "italian" || lower == "it" || lower == "4") {
-        language = Service::CFG::LANGUAGE_IT;
-        return true;
-    }
-    if (lower == "spanish" || lower == "es" || lower == "5") {
-        language = Service::CFG::LANGUAGE_ES;
-        return true;
-    }
-    if (lower == "simplified chinese" || lower == "simplified_chinese" || lower == "zh" ||
-        lower == "zh-cn" || lower == "6") {
-        language = Service::CFG::LANGUAGE_ZH;
-        return true;
-    }
-    if (lower == "korean" || lower == "ko" || lower == "kr" || lower == "7") {
-        language = Service::CFG::LANGUAGE_KO;
-        return true;
-    }
-    if (lower == "dutch" || lower == "nl" || lower == "8") {
-        language = Service::CFG::LANGUAGE_NL;
-        return true;
-    }
-    if (lower == "portuguese" || lower == "pt" || lower == "9") {
-        language = Service::CFG::LANGUAGE_PT;
-        return true;
-    }
-    if (lower == "russian" || lower == "ru" || lower == "10") {
-        language = Service::CFG::LANGUAGE_RU;
-        return true;
-    }
-    if (lower == "traditional chinese" || lower == "traditional_chinese" || lower == "tw" ||
-        lower == "zh-tw" || lower == "11") {
-        language = Service::CFG::LANGUAGE_TW;
-        return true;
+    case Action::EditText:
+        EditTextOption();
+        break;
+    case Action::NoticeChoice:
+        OverlayUI::ConsumeNoticeChoice();
+        GameOverlay::SetVisible(false);
+        break;
+    default:
+        break;
     }
     return false;
-}
-
-void ApplyConfiguredSystemLanguage(Core::System& system) {
-    const std::string language_value = SwitchFrontend::TicoConfig::GetConfiguredSystemLanguage();
-    if (language_value.empty()) {
-        return;
-    }
-
-    Service::CFG::SystemLanguage language = Service::CFG::LANGUAGE_EN;
-    if (!TryParseSystemLanguage(language_value, language)) {
-        DebugLog("invalid configured 3ds language: %s", language_value.c_str());
-        return;
-    }
-
-    auto cfg = Service::CFG::GetModule(system);
-    cfg->SetSystemLanguage(language);
-    const Result rc = cfg->UpdateConfigNANDSavegame();
-    DebugLog("configured 3ds language: %s (%u) rc=0x%x", language_value.c_str(),
-             static_cast<unsigned>(language), rc.raw);
-}
-
-void ApplyConfiguredUsername(Core::System& system) {
-    std::string username = SwitchFrontend::TicoConfig::GetConfiguredUsername();
-    if (username.empty()) {
-        return;
-    }
-
-    std::u16string username_utf16 = Common::UTF8ToUTF16(username);
-    if (username_utf16.empty()) {
-        return;
-    }
-    if (username_utf16.size() > 10) {
-        username_utf16.resize(10);
-        username = Common::UTF16ToUTF8(username_utf16);
-    }
-
-    auto cfg = Service::CFG::GetModule(system);
-    cfg->SetUsername(username_utf16);
-    const Result rc = cfg->UpdateConfigNANDSavegame();
-    DebugLog("configured 3ds username: %s rc=0x%x", username.c_str(), rc.raw);
 }
 
 int Run(int argc, char** argv) {
@@ -1108,10 +1073,14 @@ int Run(int argc, char** argv) {
     DebugLog("argc=%d", argc);
     for (int i = 0; i < argc; i++) {
         DebugLog("argv[%d]=%s", i, argv[i] ? argv[i] : "(null)");
+        launch_args.emplace_back(argv[i] ? argv[i] : "");
     }
 
+    UsbStorage::Init(); // drives mount in the background
+
     StartupLog("Run: parsing ROM path");
-    const std::string rom_path = GetRomPath(argc, argv);
+    // a game on a USB drive comes as usb://<volume>/<path>
+    const std::string rom_path = UsbStorage::Resolve(GetRomPath(argc, argv));
     const std::string display_title = GetDisplayTitle(argc, argv, rom_path);
     if (rom_path.empty()) {
         DebugLog("no ROM path supplied");
@@ -1139,12 +1108,15 @@ int Run(int argc, char** argv) {
 
     StartupLog("Run: ConfigureSettings");
     ConfigureSettings();
+    // tico's settings, and this game's own when it has them (Settings > This Game)
     SwitchFrontend::TicoConfig::ReloadConfig();
-    SwitchFrontend::TicoConfig::ApplyConfig();
-    DebugLog("tico config applied: path=%s options=%zu upscale=%s effective_res=%u",
+    SwitchFrontend::TicoSettings::MigrateOldKeys();
+    SwitchFrontend::TicoConfig::SetGame(rom_path);
+    SwitchFrontend::TicoSettings::Apply();
+    DebugLog("tico config applied: path=%s options=%zu game_settings=%d res=%u",
              SwitchFrontend::TicoConfig::GetLoadedConfigPath().c_str(),
              SwitchFrontend::TicoConfig::GetLoadedOptionCount(),
-             SwitchFrontend::TicoConfig::GetConfigValue("upscale", "default").c_str(),
+             SwitchFrontend::TicoConfig::GameSettingsActive() ? 1 : 0,
              Settings::values.resolution_factor.GetValue());
     StartupLog("Run: FileUtil::SetUserPath %s/", SystemDir);
     FileUtil::SetUserPath(std::string{SystemDir} + "/");
@@ -1185,8 +1157,7 @@ int Run(int argc, char** argv) {
         appletUnlockExit();
         return queued_tico_return ? EXIT_SUCCESS : EXIT_FAILURE;
     }
-    ApplyConfiguredSystemLanguage(system);
-    ApplyConfiguredUsername(system);
+    SwitchFrontend::TicoSettings::ApplyProfile(system);
     DebugLog("renderer resolution scale factor=%u",
              system.GPU().Renderer().GetResolutionScaleFactor());
 
@@ -1251,37 +1222,35 @@ int Run(int argc, char** argv) {
 
         if (vulkan_renderer && !overlay_init_attempted && renderer.GetCurrentFrame() > 0) {
             overlay_init_attempted = true;
-            overlay_initialized = SwitchFrontend::VulkanOverlay::Init(*vulkan_renderer);
+            overlay_initialized = SwitchFrontend::GameOverlay::Init(*vulkan_renderer);
             DebugLog("tico overlay init %s", overlay_initialized ? "succeeded" : "failed");
         }
 
         if (overlay_initialized) {
-            SwitchFrontend::VulkanOverlay::Update(&pad);
-            const bool renderer_reset_requested = HandleOverlayAction(
-                system, static_cast<SwitchFrontend::OverlayUI::Action>(
-                            SwitchFrontend::VulkanOverlay::ConsumeAction()));
-            if (renderer_reset_requested) {
+            SwitchFrontend::GameOverlay::Update(&pad);
+            if (SwitchFrontend::OverlayUI::ConsumeSettingsChanged()) {
+                SwitchFrontend::TicoSettings::ApplyLive(system);
+                DebugLog("tico overlay: settings applied");
+            }
+            if (HandleOverlayAction(system, SwitchFrontend::GameOverlay::ConsumeAction())) {
                 overlay_initialized = false;
                 overlay_init_attempted = false;
                 last_keepalive = Clock::now();
                 DebugLog("tico overlay shut down for renderer reset");
             }
         }
-        if ((!overlay_initialized || !SwitchFrontend::VulkanOverlay::IsVisible()) &&
-            LayoutComboPressed()) {
+        const bool overlay_visible =
+            overlay_initialized && SwitchFrontend::GameOverlay::IsVisible();
+        if (!overlay_visible && LayoutComboPressed()) {
             CycleScreenLayout();
         }
-        if ((!overlay_initialized || !SwitchFrontend::VulkanOverlay::IsVisible()) &&
-            UprightComboPressed()) {
+        if (!overlay_visible && UprightComboPressed()) {
             ToggleUprightScreen();
         }
-        if ((!overlay_initialized || !SwitchFrontend::VulkanOverlay::IsVisible()) &&
-            SwapScreensHotkeyPressed()) {
+        if (!overlay_visible && SwapScreensHotkeyPressed()) {
             ToggleSwapScreens();
         }
 
-        const bool overlay_visible =
-            overlay_initialized && SwitchFrontend::VulkanOverlay::IsVisible();
         Core::System::ResultStatus run_result = Core::System::ResultStatus::Success;
         if (overlay_visible && vulkan_renderer) {
             vulkan_renderer->RedrawCurrentFrame();
@@ -1347,7 +1316,7 @@ int Run(int argc, char** argv) {
              static_cast<unsigned long long>(loop_count));
     if (overlay_initialized) {
         DebugLog("shutdown step: overlay.Shutdown begin");
-        SwitchFrontend::VulkanOverlay::Shutdown();
+        SwitchFrontend::GameOverlay::Shutdown();
         DebugLog("shutdown step: overlay.Shutdown done");
     }
     if (system.IsPoweredOn()) {

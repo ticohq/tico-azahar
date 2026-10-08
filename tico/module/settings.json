@@ -1,0 +1,630 @@
+{
+  "core_id": "azahar",
+  "display_name": "Azahar",
+  "config_file": "azahar.jsonc",
+  "slugs": [
+    "3ds",
+    "citra",
+    "azahar"
+  ],
+  "is_libretro": false,
+  "bool_true_value": "true",
+  "bool_false_value": "false",
+  "tabs": [
+    {
+      "name": "settings_azahar_system",
+      "sections": [
+        {
+          "title": "settings_azahar_console",
+          "options": [
+            {
+              "key": "azahar_new_3ds",
+              "label": "settings_azahar_new_3ds",
+              "type": "bool",
+              "default": "true",
+              "restart": true
+            },
+            {
+              "key": "azahar_region",
+              "label": "settings_azahar_region",
+              "type": "enum",
+              "default": "Auto",
+              "restart": true,
+              "choices": [
+                {
+                  "label": "Auto",
+                  "value": "Auto"
+                },
+                {
+                  "label": "Japan",
+                  "value": "Japan"
+                },
+                {
+                  "label": "USA",
+                  "value": "USA"
+                },
+                {
+                  "label": "Europe",
+                  "value": "Europe"
+                },
+                {
+                  "label": "Australia",
+                  "value": "Australia"
+                },
+                {
+                  "label": "China",
+                  "value": "China"
+                },
+                {
+                  "label": "Korea",
+                  "value": "Korea"
+                },
+                {
+                  "label": "Taiwan",
+                  "value": "Taiwan"
+                }
+              ]
+            },
+            {
+              "key": "azahar_language",
+              "label": "settings_azahar_language",
+              "type": "enum",
+              "default": "English",
+              "restart": true,
+              "choices": [
+                {
+                  "label": "Japanese",
+                  "value": "Japanese"
+                },
+                {
+                  "label": "English",
+                  "value": "English"
+                },
+                {
+                  "label": "French",
+                  "value": "French"
+                },
+                {
+                  "label": "German",
+                  "value": "German"
+                },
+                {
+                  "label": "Italian",
+                  "value": "Italian"
+                },
+                {
+                  "label": "Spanish",
+                  "value": "Spanish"
+                },
+                {
+                  "label": "Simplified Chinese",
+                  "value": "Simplified Chinese"
+                },
+                {
+                  "label": "Korean",
+                  "value": "Korean"
+                },
+                {
+                  "label": "Dutch",
+                  "value": "Dutch"
+                },
+                {
+                  "label": "Portuguese",
+                  "value": "Portuguese"
+                },
+                {
+                  "label": "Russian",
+                  "value": "Russian"
+                },
+                {
+                  "label": "Traditional Chinese",
+                  "value": "Traditional Chinese"
+                }
+              ]
+            },
+            {
+              "key": "azahar_username",
+              "label": "settings_azahar_username",
+              "type": "string",
+              "default": "AZAHAR",
+              "restart": true,
+              "max_length": 10
+            },
+            {
+              "key": "azahar_use_virtual_sd",
+              "label": "settings_azahar_use_virtual_sd",
+              "type": "bool",
+              "default": "true",
+              "restart": true
+            }
+          ]
+        },
+        {
+          "title": "settings_azahar_cpu",
+          "options": [
+            {
+              "key": "azahar_cpu_clock",
+              "label": "settings_azahar_cpu_clock",
+              "type": "enum",
+              "default": "100",
+              "choices": [
+                {
+                  "label": "25%",
+                  "value": "25"
+                },
+                {
+                  "label": "50%",
+                  "value": "50"
+                },
+                {
+                  "label": "75%",
+                  "value": "75"
+                },
+                {
+                  "label": "100%",
+                  "value": "100"
+                },
+                {
+                  "label": "125%",
+                  "value": "125"
+                },
+                {
+                  "label": "150%",
+                  "value": "150"
+                },
+                {
+                  "label": "175%",
+                  "value": "175"
+                },
+                {
+                  "label": "200%",
+                  "value": "200"
+                },
+                {
+                  "label": "250%",
+                  "value": "250"
+                },
+                {
+                  "label": "300%",
+                  "value": "300"
+                },
+                {
+                  "label": "350%",
+                  "value": "350"
+                },
+                {
+                  "label": "400%",
+                  "value": "400"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "settings_azahar_graphics",
+      "sections": [
+        {
+          "title": "settings_azahar_renderer",
+          "options": [
+            {
+              "key": "azahar_resolution",
+              "label": "settings_azahar_resolution",
+              "type": "enum",
+              "default": "1",
+              "choices": [
+                {
+                  "label": "Native",
+                  "value": "1"
+                },
+                {
+                  "label": "2x",
+                  "value": "2"
+                },
+                {
+                  "label": "3x",
+                  "value": "3"
+                },
+                {
+                  "label": "4x",
+                  "value": "4"
+                },
+                {
+                  "label": "5x",
+                  "value": "5"
+                },
+                {
+                  "label": "6x",
+                  "value": "6"
+                },
+                {
+                  "label": "7x",
+                  "value": "7"
+                },
+                {
+                  "label": "8x",
+                  "value": "8"
+                },
+                {
+                  "label": "9x",
+                  "value": "9"
+                },
+                {
+                  "label": "10x",
+                  "value": "10"
+                }
+              ]
+            },
+            {
+              "key": "azahar_use_hw_shader",
+              "label": "settings_azahar_use_hw_shader",
+              "type": "bool",
+              "default": "true",
+              "restart": true
+            },
+            {
+              "key": "azahar_shader_jit",
+              "label": "settings_azahar_shader_jit",
+              "type": "bool",
+              "default": "true",
+              "restart": true
+            },
+            {
+              "key": "azahar_accurate_mul",
+              "label": "settings_azahar_accurate_mul",
+              "type": "bool",
+              "default": "true",
+              "restart": true
+            },
+            {
+              "key": "azahar_disk_shader_cache",
+              "label": "settings_azahar_disk_shader_cache",
+              "type": "bool",
+              "default": "true",
+              "restart": true
+            },
+            {
+              "key": "azahar_async_shaders",
+              "label": "settings_azahar_async_shaders",
+              "type": "bool",
+              "default": "true",
+              "restart": true
+            },
+            {
+              "key": "azahar_vsync",
+              "label": "settings_azahar_vsync",
+              "type": "bool",
+              "default": "true"
+            },
+            {
+              "key": "azahar_simulate_gpu_timings",
+              "label": "settings_azahar_simulate_gpu_timings",
+              "type": "bool",
+              "default": "false"
+            },
+            {
+              "key": "azahar_right_eye",
+              "label": "settings_azahar_right_eye",
+              "type": "bool",
+              "default": "false"
+            }
+          ]
+        },
+        {
+          "title": "settings_azahar_textures",
+          "options": [
+            {
+              "key": "azahar_texture_filter",
+              "label": "settings_azahar_texture_filter",
+              "type": "enum",
+              "default": "none",
+              "choices": [
+                {
+                  "label": "None",
+                  "value": "none"
+                },
+                {
+                  "label": "Anime4K Ultrafast",
+                  "value": "Anime4K Ultrafast"
+                },
+                {
+                  "label": "Bicubic",
+                  "value": "Bicubic"
+                },
+                {
+                  "label": "ScaleForce",
+                  "value": "ScaleForce"
+                },
+                {
+                  "label": "xBRZ",
+                  "value": "xBRZ"
+                },
+                {
+                  "label": "MMPX",
+                  "value": "MMPX"
+                }
+              ]
+            },
+            {
+              "key": "azahar_texture_sampling",
+              "label": "settings_azahar_texture_sampling",
+              "type": "enum",
+              "default": "GameControlled",
+              "choices": [
+                {
+                  "label": "Game Controlled",
+                  "value": "GameControlled"
+                },
+                {
+                  "label": "Nearest Neighbor",
+                  "value": "NearestNeighbor"
+                },
+                {
+                  "label": "Linear",
+                  "value": "Linear"
+                }
+              ]
+            },
+            {
+              "key": "azahar_custom_textures",
+              "label": "settings_azahar_custom_textures",
+              "type": "bool",
+              "default": "false",
+              "restart": true
+            },
+            {
+              "key": "azahar_dump_textures",
+              "label": "settings_azahar_dump_textures",
+              "type": "bool",
+              "default": "false",
+              "restart": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "settings_azahar_screen",
+      "sections": [
+        {
+          "title": "settings_azahar_layout",
+          "options": [
+            {
+              "key": "azahar_layout",
+              "label": "settings_azahar_layout_option",
+              "type": "enum",
+              "default": "default",
+              "choices": [
+                {
+                  "label": "Default",
+                  "value": "default"
+                },
+                {
+                  "label": "Single Screen",
+                  "value": "single"
+                },
+                {
+                  "label": "Large Screen",
+                  "value": "large"
+                },
+                {
+                  "label": "Large Screen Inverted",
+                  "value": "large_inverted"
+                },
+                {
+                  "label": "Side by Side",
+                  "value": "side"
+                },
+                {
+                  "label": "Hybrid",
+                  "value": "hybrid"
+                },
+                {
+                  "label": "Hybrid Inverted",
+                  "value": "hybrid_inverted"
+                }
+              ]
+            },
+            {
+              "key": "azahar_large_screen_proportion",
+              "label": "settings_azahar_large_screen_proportion",
+              "type": "enum",
+              "default": "4.00",
+              "choices": [
+                {
+                  "label": "1.00",
+                  "value": "1.00"
+                },
+                {
+                  "label": "1.50",
+                  "value": "1.50"
+                },
+                {
+                  "label": "2.00",
+                  "value": "2.00"
+                },
+                {
+                  "label": "2.50",
+                  "value": "2.50"
+                },
+                {
+                  "label": "3.00",
+                  "value": "3.00"
+                },
+                {
+                  "label": "3.50",
+                  "value": "3.50"
+                },
+                {
+                  "label": "4.00",
+                  "value": "4.00"
+                },
+                {
+                  "label": "4.50",
+                  "value": "4.50"
+                },
+                {
+                  "label": "5.00",
+                  "value": "5.00"
+                },
+                {
+                  "label": "5.50",
+                  "value": "5.50"
+                },
+                {
+                  "label": "6.00",
+                  "value": "6.00"
+                }
+              ]
+            },
+            {
+              "key": "azahar_orientation",
+              "label": "settings_azahar_orientation",
+              "type": "enum",
+              "default": "horizontal",
+              "choices": [
+                {
+                  "label": "Horizontal",
+                  "value": "horizontal"
+                },
+                {
+                  "label": "Vertical",
+                  "value": "vertical"
+                },
+                {
+                  "label": "Horizontal Inverted",
+                  "value": "horizontal_inverted"
+                },
+                {
+                  "label": "Vertical Inverted",
+                  "value": "vertical_inverted"
+                }
+              ]
+            },
+            {
+              "key": "azahar_display_size",
+              "label": "settings_azahar_display_size",
+              "type": "enum",
+              "default": "Fill",
+              "choices": [
+                {
+                  "label": "Fill",
+                  "value": "Fill"
+                },
+                {
+                  "label": "Stretch",
+                  "value": "Stretch"
+                },
+                {
+                  "label": "Original",
+                  "value": "Original"
+                }
+              ]
+            },
+            {
+              "key": "azahar_swap_screens",
+              "label": "settings_azahar_swap_screens",
+              "type": "bool",
+              "default": "false"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "settings_azahar_audio",
+      "sections": [
+        {
+          "title": "settings_azahar_output",
+          "options": [
+            {
+              "key": "azahar_volume",
+              "label": "settings_azahar_volume",
+              "type": "enum",
+              "default": "100",
+              "choices": [
+                {
+                  "label": "0%",
+                  "value": "0"
+                },
+                {
+                  "label": "10%",
+                  "value": "10"
+                },
+                {
+                  "label": "20%",
+                  "value": "20"
+                },
+                {
+                  "label": "30%",
+                  "value": "30"
+                },
+                {
+                  "label": "40%",
+                  "value": "40"
+                },
+                {
+                  "label": "50%",
+                  "value": "50"
+                },
+                {
+                  "label": "60%",
+                  "value": "60"
+                },
+                {
+                  "label": "70%",
+                  "value": "70"
+                },
+                {
+                  "label": "80%",
+                  "value": "80"
+                },
+                {
+                  "label": "90%",
+                  "value": "90"
+                },
+                {
+                  "label": "100%",
+                  "value": "100"
+                }
+              ]
+            },
+            {
+              "key": "azahar_audio_stretching",
+              "label": "settings_azahar_audio_stretching",
+              "type": "bool",
+              "default": "true"
+            }
+          ]
+        },
+        {
+          "title": "settings_azahar_microphone",
+          "options": [
+            {
+              "key": "azahar_mic_input",
+              "label": "settings_azahar_mic_input",
+              "type": "enum",
+              "default": "none",
+              "restart": true,
+              "choices": [
+                {
+                  "label": "None",
+                  "value": "none"
+                },
+                {
+                  "label": "Auto",
+                  "value": "auto"
+                },
+                {
+                  "label": "Static Noise",
+                  "value": "static_noise"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

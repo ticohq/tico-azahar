@@ -66,12 +66,13 @@ ROMFS_DIR="${BUILD_DIR}/tico_romfs"
 nacptool --create "tico Azahar" "ticoverse.com" "1.0.6" "${NACP_FILE}"
 rm -rf "${ROMFS_DIR}"
 mkdir -p "${ROMFS_DIR}"
-cp -R "${SCRIPT_DIR}/src/tico/fonts" "${ROMFS_DIR}/fonts"
-cp -R "${SCRIPT_DIR}/src/tico/lang" "${ROMFS_DIR}/lang"
-cp -R "${SCRIPT_DIR}/src/tico/assets" "${ROMFS_DIR}/assets"
-if [ -d "${SCRIPT_DIR}/src/tico/config" ]; then
-    cp -R "${SCRIPT_DIR}/src/tico/config" "${ROMFS_DIR}/config"
-fi
+# the overlay's fonts, strings and pictures, and the settings definition it
+# reads (the same settings.json tico reads from the installed module)
+cp -R "${SCRIPT_DIR}/tico/fonts" "${ROMFS_DIR}/fonts"
+cp -R "${SCRIPT_DIR}/tico/lang" "${ROMFS_DIR}/lang"
+cp -R "${SCRIPT_DIR}/tico/assets" "${ROMFS_DIR}/assets"
+mkdir -p "${ROMFS_DIR}/module"
+cp "${SCRIPT_DIR}/tico/module/settings.json" "${ROMFS_DIR}/module/"
 cp "${ELF_FILE}" "${BUILD_DIR}/azahar-switch.debug.elf"
 "${DEVKITPRO}/devkitA64/bin/aarch64-none-elf-strip" --strip-all "${ELF_FILE}"
 elf2nro "${ELF_FILE}" "${NRO_FILE}" --nacp="${NACP_FILE}" --romfsdir="${ROMFS_DIR}"
@@ -84,6 +85,23 @@ if [ -n "${SWITCH_SD_ROOT:-}" ]; then
     echo "Installed: ${SWITCH_SD_ROOT}/switch/azahar-switch.nro"
     echo "Installed: ${SWITCH_SD_ROOT}/tico/cores/tico-azahar.nro"
 fi
+
+# The tico module: a directory that extracts to sdmc:/tico/modules/<id>/.
+# tico reads module.json, the settings definition and the strings from it,
+# and launches the NRO beside them.
+MODULE_SRC="${SCRIPT_DIR}/tico/module"
+MODULE_ID=$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${MODULE_SRC}/module.json" | head -1)
+PACKAGE_DIR="${SCRIPT_DIR}/build_tico"
+MODULE_OUT="${PACKAGE_DIR}/module/${MODULE_ID}"
+rm -rf "${PACKAGE_DIR}"
+mkdir -p "${MODULE_OUT}"
+cp -r "${MODULE_SRC}/." "${MODULE_OUT}/"
+cp "${TICO_NRO_FILE}" "${MODULE_OUT}/"
+cp -R "${SCRIPT_DIR}/tico/lang" "${MODULE_OUT}/"
+gzip -f -9 "${MODULE_OUT}"/gamelists/*.json 2>/dev/null || true
+BUNDLE="${PACKAGE_DIR}/tico-${MODULE_ID}-module.zip"
+( cd "${PACKAGE_DIR}/module" && zip -qr "${BUNDLE}" "${MODULE_ID}" )
+echo "Module: ${BUNDLE} (extracts to sdmc:/tico/modules/${MODULE_ID}/)"
 
 echo "Output: ${NRO_FILE}"
 echo "Output: ${TICO_NRO_FILE}"

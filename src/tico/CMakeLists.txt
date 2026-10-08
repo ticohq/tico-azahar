@@ -1,26 +1,39 @@
+set(TICO_SHARED_DIR ${PROJECT_SOURCE_DIR}/tico)
+
 add_executable(tico
     emu_window_switch.cpp
     emu_window_switch.h
+    game_overlay.cpp
+    game_overlay.h
     main.cpp
     switch_keyboard.cpp
     switch_keyboard.h
     switch_compat.cpp
     switch_libnx.h
-    overlay/overlay_ui.cpp
-    overlay/overlay_ui.h
-    overlay/tico_config.cpp
-    overlay/tico_config.h
-    overlay/translation_manager.cpp
-    overlay/translation_manager.h
-    overlay/vulkan_overlay.cpp
-    overlay/vulkan_overlay.h
+    tico_settings.cpp
+    tico_settings.h
+    # tico's overlay, shared with the other cores
+    ${TICO_SHARED_DIR}/UsbStorage.cpp
+    ${TICO_SHARED_DIR}/UsbStorage.h
+    ${TICO_SHARED_DIR}/overlay/imgui_overlay.cpp
+    ${TICO_SHARED_DIR}/overlay/imgui_overlay.h
+    ${TICO_SHARED_DIR}/overlay/overlay_renderer.h
+    ${TICO_SHARED_DIR}/overlay/overlay_ui.cpp
+    ${TICO_SHARED_DIR}/overlay/overlay_ui.h
+    ${TICO_SHARED_DIR}/overlay/ra_alerts.cpp
+    ${TICO_SHARED_DIR}/overlay/ra_alerts.h
+    ${TICO_SHARED_DIR}/overlay/tico_config.cpp
+    ${TICO_SHARED_DIR}/overlay/tico_config.h
+    ${TICO_SHARED_DIR}/overlay/translation_manager.cpp
+    ${TICO_SHARED_DIR}/overlay/translation_manager.h
 )
 
 create_target_directory_groups(tico)
 set_target_properties(tico PROPERTIES OUTPUT_NAME "azahar-switch.elf")
 target_compile_definitions(tico PRIVATE __SWITCH__)
 
-target_include_directories(tico PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_include_directories(tico PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${TICO_SHARED_DIR}
+    ${TICO_SHARED_DIR}/deps/usbhsfs/include)
 
 if(NOT DEVKITPRO)
     if(DEFINED ENV{DEVKITPRO})
@@ -78,6 +91,10 @@ target_link_libraries(tico PRIVATE
     ${SWITCH_VULKAN_LIB}
     ${SWITCH_DRM_NOUVEAU_LIB}
     ${SWITCH_EXPAT_LIB}
+    # libusbhsfs (FAT/exFAT) that also reads NTFS, read-only, through usbntfs;
+    # by path so portlibs' FAT-only copy is not picked up instead, and before libnx
+    ${TICO_SHARED_DIR}/deps/usbhsfs/lib/libusbhsfs.a
+    ${TICO_SHARED_DIR}/deps/usbhsfs/lib/libusbntfs.a
     z
     nx
     m
