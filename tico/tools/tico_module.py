@@ -126,6 +126,29 @@ STRINGS = {
     "audio_stretching": ("Audio Stretching", "Audio-Stretching", "Estiramiento de audio", "Étirement audio", "オーディオストレッチ", "Esticamento de áudio", "Растяжение звука", "音频拉伸"),
     "controls": ("Controls", "Steuerung", "Controles", "Commandes", "操作", "Controles", "Управление", "控制"),
     "button_mapping": ("Button Mapping", "Tastenbelegung", "Asignación de botones", "Attribution des boutons", "ボタン割り当て", "Mapeamento de botões", "Назначение кнопок", "按键映射"),
+    "macros": ("Macros", "Makros", "Macros", "Macros", "マクロ", "Macros", "Макросы", "宏"),
+    "macro1_button": ("Macro 1 Button", "Makro-1-Taste", "Botón de macro 1", "Bouton de la macro 1",
+                      "マクロ1のボタン", "Botão da macro 1", "Кнопка макроса 1", "宏 1 按键"),
+    "macro1_press1": ("Macro 1 Presses", "Makro 1 drückt", "Macro 1 pulsa", "La macro 1 appuie sur",
+                      "マクロ1で押す", "Macro 1 aperta", "Макрос 1 нажимает", "宏 1 按下"),
+    "macro1_press2": ("Macro 1 Also Presses", "Makro 1 drückt auch", "Macro 1 también pulsa",
+                      "La macro 1 appuie aussi sur", "マクロ1でさらに押す", "Macro 1 também aperta",
+                      "Макрос 1 также нажимает", "宏 1 同时按下"),
+    "macro1_swap": ("Macro 1 Swaps Screens", "Makro 1 tauscht Bildschirme",
+                    "Macro 1 intercambia pantallas", "La macro 1 inverse les écrans",
+                    "マクロ1で画面を入れ替え", "Macro 1 troca as telas", "Макрос 1 меняет экраны",
+                    "宏 1 交换屏幕"),
+    "macro2_button": ("Macro 2 Button", "Makro-2-Taste", "Botón de macro 2", "Bouton de la macro 2",
+                      "マクロ2のボタン", "Botão da macro 2", "Кнопка макроса 2", "宏 2 按键"),
+    "macro2_press1": ("Macro 2 Presses", "Makro 2 drückt", "Macro 2 pulsa", "La macro 2 appuie sur",
+                      "マクロ2で押す", "Macro 2 aperta", "Макрос 2 нажимает", "宏 2 按下"),
+    "macro2_press2": ("Macro 2 Also Presses", "Makro 2 drückt auch", "Macro 2 también pulsa",
+                      "La macro 2 appuie aussi sur", "マクロ2でさらに押す", "Macro 2 também aperta",
+                      "Макрос 2 также нажимает", "宏 2 同时按下"),
+    "macro2_swap": ("Macro 2 Swaps Screens", "Makro 2 tauscht Bildschirme",
+                    "Macro 2 intercambia pantallas", "La macro 2 inverse les écrans",
+                    "マクロ2で画面を入れ替え", "Macro 2 troca as telas", "Макрос 2 меняет экраны",
+                    "宏 2 交换屏幕"),
     "sticks": ("Sticks", "Sticks", "Palancas", "Sticks", "スティック", "Analógicos", "Стики", "摇杆"),
     "map_a": ("A Button", "A-Taste", "Botón A", "Bouton A", "Aボタン", "Botão A", "Кнопка A", "A 键"),
     "map_b": ("B Button", "B-Taste", "Botón B", "Bouton B", "Bボタン", "Botão B", "Кнопка B", "B 键"),
@@ -244,6 +267,22 @@ SWITCH_BUTTONS = choices(("A", "A"), ("B", "B"), ("X", "X"), ("Y", "Y"), ("L", "
 STICKS = choices(("Left stick", "Left"), ("Right stick", "Right"), ("Disabled", "None"))
 
 
+# the 3DS buttons a macro can press
+N3DS_BUTTONS = choices(("Disabled", "None"), ("A", "A"), ("B", "B"), ("X", "X"), ("Y", "Y"),
+                       ("L", "L"), ("R", "R"), ("ZL", "ZL"), ("ZR", "ZR"), ("Start", "Start"),
+                       ("Select", "Select"), ("Up", "Up"), ("Down", "Down"), ("Left", "Left"),
+                       ("Right", "Right"), ("HOME", "Home"))
+
+
+def macro(n):
+    return [
+        option(f"macro{n}_button", f"macro{n}_button", "enum", "None", choices=SWITCH_BUTTONS),
+        option(f"macro{n}_press1", f"macro{n}_press1", "enum", "None", choices=N3DS_BUTTONS),
+        option(f"macro{n}_press2", f"macro{n}_press2", "enum", "None", choices=N3DS_BUTTONS),
+        option(f"macro{n}_swap", f"macro{n}_swap", "bool", "false"),
+    ]
+
+
 def button(name, default):
     return option("map_" + name, "map_" + name, "enum", default, choices=SWITCH_BUTTONS)
 
@@ -346,6 +385,9 @@ TABS = [
             option("map_circle_pad", "map_circle_pad", "enum", "Left", choices=STICKS),
             option("map_c_stick", "map_c_stick", "enum", "Right", choices=STICKS),
         ]),
+        # one Switch button pressing up to two 3DS buttons at once, and swapping the
+        # screens as it goes down
+        ("macros", macro(1) + macro(2)),
     ]),
     ("audio", [
         ("output", [

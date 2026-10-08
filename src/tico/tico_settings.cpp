@@ -5,6 +5,7 @@
 #include "tico/tico_settings.h"
 
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cctype>
 #include <map>
@@ -242,6 +243,9 @@ void ApplyDisplaySize(std::string_view value, bool swapped) {
     }
 }
 
+// the Switch buttons whose macro swaps the screens
+std::atomic<u64> s_swap_macro_buttons{0};
+
 // The Switch button a mapping option names, 0 for none.
 u64 SwitchButton(std::string_view name) {
     static const std::map<std::string, u64, std::less<>> kButtons = {
@@ -279,9 +283,48 @@ void ApplyControls(const Values& values) {
         {Settings::NativeButton::Right, "azahar_map_right"},
         {Settings::NativeButton::Home, "azahar_map_home"},
     }};
+    std::array<u64, Settings::NativeButton::NumButtons> masks{};
+    for (const auto& [native, key] : kButtons) {
+        masks[native] = SwitchButton(Get(values, key));
+    }
+
+    // Controls > Macros: a macro's button presses its 3DS buttons along with
+    // whatever the button is mapped to, and may swap the screens
+    static constexpr std::array<std::pair<const char*, Settings::NativeButton::Values>, 15>
+        kNative = {{
+        {"A", Settings::NativeButton::A},         {"B", Settings::NativeButton::B},
+        {"X", Settings::NativeButton::X},         {"Y", Settings::NativeButton::Y},
+        {"L", Settings::NativeButton::L},         {"R", Settings::NativeButton::R},
+        {"ZL", Settings::NativeButton::ZL},       {"ZR", Settings::NativeButton::ZR},
+        {"Start", Settings::NativeButton::Start}, {"Select", Settings::NativeButton::Select},
+        {"Up", Settings::NativeButton::Up},       {"Down", Settings::NativeButton::Down},
+        {"Left", Settings::NativeButton::Left},   {"Right", Settings::NativeButton::Right},
+        {"Home", Settings::NativeButton::Home},
+    }};
+    u64 swap_buttons = 0;
+    for (int n = 1; n <= 2; ++n) {
+        const std::string prefix = "azahar_macro" + std::to_string(n) + "_";
+        const u64 trigger = SwitchButton(Get(values, prefix + "button"));
+        if (trigger == 0) {
+            continue;
+        }
+        for (const char* press : {"press1", "press2"}) {
+            const std::string target = Get(values, prefix + press);
+            for (const auto& [name, native] : kNative) {
+                if (target == name) {
+                    masks[native] |= trigger;
+                }
+            }
+        }
+        if (GetBool(values, prefix + "swap")) {
+            swap_buttons |= trigger;
+        }
+    }
+    s_swap_macro_buttons = swap_buttons;
+
     auto& profile = Settings::values.current_input_profile;
     for (const auto& [native, key] : kButtons) {
-        const u64 mask = SwitchButton(Get(values, key));
+        const u64 mask = masks[native];
         if (mask == 0) {
             profile.buttons[native].clear();
             continue;
@@ -400,6 +443,10 @@ void ApplyLive(Core::System& system) {
     ApplyLiveValues(CurrentValues());
     system.ApplySettings();
     MovieThrottle::Reapply(system);
+}
+
+unsigned long long SwapScreensMacroButtons() {
+    return s_swap_macro_buttons.load();
 }
 
 void ApplyProfile(Core::System& system) {

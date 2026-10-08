@@ -834,10 +834,13 @@ bool UprightComboPressed() {
     return triggered;
 }
 
+// Left stick press, and the buttons of the macros set to swap the screens.
 bool SwapScreensHotkeyPressed() {
     static bool was_down = false;
     const u64 buttons = padGetButtons(&pad);
-    const bool down = (buttons & HidNpadButton_StickL) != 0;
+    const u64 hotkeys =
+        HidNpadButton_StickL | SwitchFrontend::TicoSettings::SwapScreensMacroButtons();
+    const bool down = (buttons & hotkeys) != 0;
     const bool triggered = down && !was_down;
     was_down = down;
     return triggered;

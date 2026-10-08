@@ -1921,6 +1921,463 @@
               ]
             }
           ]
+        },
+        {
+          "title": "settings_azahar_macros",
+          "options": [
+            {
+              "key": "azahar_macro1_button",
+              "label": "settings_azahar_macro1_button",
+              "type": "enum",
+              "default": "None",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_macro1_press1",
+              "label": "settings_azahar_macro1_press1",
+              "type": "enum",
+              "default": "None",
+              "choices": [
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                },
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Start",
+                  "value": "Start"
+                },
+                {
+                  "label": "Select",
+                  "value": "Select"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "HOME",
+                  "value": "Home"
+                }
+              ]
+            },
+            {
+              "key": "azahar_macro1_press2",
+              "label": "settings_azahar_macro1_press2",
+              "type": "enum",
+              "default": "None",
+              "choices": [
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                },
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Start",
+                  "value": "Start"
+                },
+                {
+                  "label": "Select",
+                  "value": "Select"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "HOME",
+                  "value": "Home"
+                }
+              ]
+            },
+            {
+              "key": "azahar_macro1_swap",
+              "label": "settings_azahar_macro1_swap",
+              "type": "bool",
+              "default": "false"
+            },
+            {
+              "key": "azahar_macro2_button",
+              "label": "settings_azahar_macro2_button",
+              "type": "enum",
+              "default": "None",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_macro2_press1",
+              "label": "settings_azahar_macro2_press1",
+              "type": "enum",
+              "default": "None",
+              "choices": [
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                },
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Start",
+                  "value": "Start"
+                },
+                {
+                  "label": "Select",
+                  "value": "Select"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "HOME",
+                  "value": "Home"
+                }
+              ]
+            },
+            {
+              "key": "azahar_macro2_press2",
+              "label": "settings_azahar_macro2_press2",
+              "type": "enum",
+              "default": "None",
+              "choices": [
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                },
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Start",
+                  "value": "Start"
+                },
+                {
+                  "label": "Select",
+                  "value": "Select"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "HOME",
+                  "value": "Home"
+                }
+              ]
+            },
+            {
+              "key": "azahar_macro2_swap",
+              "label": "settings_azahar_macro2_swap",
+              "type": "bool",
+              "default": "false"
+            }
+          ]
         }
       ]
     },
