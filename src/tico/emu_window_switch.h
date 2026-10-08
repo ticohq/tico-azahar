@@ -39,6 +39,8 @@ private:
     // width << 32 | height, read by the thread that renders
     std::atomic<u64> target_size{};
     std::atomic<bool> size_changed{};
+    // the window was sized 1080p (the game started docked)
+    bool window_is_1080p = false;
     PadState cursor_pad{};
     bool physical_touch_pressed{};
     bool cursor_visible{};

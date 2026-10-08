@@ -13,8 +13,11 @@
 
 namespace SwitchFrontend {
 namespace {
-constexpr u32 DefaultWidth = 1280;
-constexpr u32 DefaultHeight = 720;
+// what the console scans out handheld and docked
+constexpr u32 HandheldWidth = 1280;
+constexpr u32 HandheldHeight = 720;
+constexpr u32 DockedWidth = 1920;
+constexpr u32 DockedHeight = 1080;
 constexpr u32 TouchWidth = 1280;
 constexpr u32 TouchHeight = 720;
 constexpr float CursorMaxSpeed = 220.0f;
@@ -34,6 +37,9 @@ std::pair<float, float> ApplyCursorResponse(float x_axis, float y_axis) {
     const float scale = curved / magnitude;
     return {x_axis * scale, y_axis * scale};
 }
+bool IsDocked() {
+    return appletGetOperationMode() == AppletOperationMode_Console;
+}
 } // namespace
 
 EmuWindowSwitch::EmuWindowSwitch(NWindow* window_)
@@ -45,6 +51,13 @@ EmuWindowSwitch::EmuWindowSwitch(NWindow* window_)
     window_info.render_surface_scale = 1.0f;
     padInitializeDefault(&cursor_pad);
     hidInitializeTouchScreen();
+    // The swapchain takes the window's size once, as the renderer starts: 1080p when the game
+    // starts docked. Docking or undocking later lays the screens out for the other size, never
+    // larger than the window, which the system then scales to the screen.
+    if (IsDocked() && window && nwindowIsValid(window) &&
+        nwindowSetDimensions(window, DockedWidth, DockedHeight) == 0) {
+        window_is_1080p = true;
+    }
     RefreshDimensions();
     // nothing renders yet: lay out now, later the GPU does it
     const auto [width, height] = GetTargetFramebufferSize();
@@ -61,15 +74,10 @@ void EmuWindowSwitch::PollEvents() {
 }
 
 void EmuWindowSwitch::RefreshDimensions() {
-    u32 width = DefaultWidth;
-    u32 height = DefaultHeight;
-    if (window) {
-        static_cast<void>(nwindowGetDimensions(window, &width, &height));
-        if (width == 0 || height == 0) {
-            width = DefaultWidth;
-            height = DefaultHeight;
-        }
-    }
+    // the screens are laid out for what the console scans out now, docked or handheld
+    const bool docked = window_is_1080p && IsDocked();
+    const u32 width = docked ? DockedWidth : HandheldWidth;
+    const u32 height = docked ? DockedHeight : HandheldHeight;
     // The layout itself is the renderer's, which may run on the GPU thread: the size is recorded
     // and the GPU lays the screens out for it (see TakeSizeChange).
     const u64 packed = (static_cast<u64>(width) << 32) | height;
