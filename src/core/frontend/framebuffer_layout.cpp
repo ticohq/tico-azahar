@@ -116,6 +116,43 @@ static void StretchScreenRectangle(Common::Rectangle<u32>& screen, bool stretch,
                                     bounds_bottom - vertical_padding};
 }
 
+// Screens stacked one above the other only stretch across. When the window is
+// taller than the two of them (the console held upright), the height left over
+// goes to the stretched screens too, in proportion to their heights, so they
+// fill the window from top to bottom.
+static void FillStackedHeight(Common::Rectangle<u32>& top, bool top_stretch,
+                              Common::Rectangle<u32>& bottom, bool bottom_stretch, u32 height,
+                              u32 gap) {
+    if (!top_stretch && !bottom_stretch) {
+        return;
+    }
+    const bool top_is_upper = top.top <= bottom.top;
+    Common::Rectangle<u32>& upper = top_is_upper ? top : bottom;
+    Common::Rectangle<u32>& lower = top_is_upper ? bottom : top;
+    const bool upper_stretch = top_is_upper ? top_stretch : bottom_stretch;
+    const bool lower_stretch = top_is_upper ? bottom_stretch : top_stretch;
+
+    const u32 upper_height = upper.GetHeight();
+    const u32 lower_height = lower.GetHeight();
+    const u32 used = upper_height + lower_height + gap;
+    if (used >= height) {
+        return;
+    }
+    const u32 extra = height - used;
+    const u32 sharing =
+        (upper_stretch ? upper_height : 0) + (lower_stretch ? lower_height : 0);
+    if (sharing == 0) {
+        return;
+    }
+    const u32 upper_extra =
+        upper_stretch ? static_cast<u32>(static_cast<u64>(extra) * upper_height / sharing) : 0;
+    const u32 lower_extra = lower_stretch ? extra - upper_extra : 0;
+
+    upper = {upper.left, 0, upper.right, upper_height + upper_extra};
+    const u32 lower_top = upper.bottom + gap;
+    lower = {lower.left, lower_top, lower.right, lower_top + lower_height + lower_extra};
+}
+
 FramebufferLayout DefaultFrameLayout(u32 width, u32 height, bool swapped, bool upright) {
     return LargeFrameLayout(width, height, swapped, upright, 1.0f,
                             Settings::SmallScreenPosition::BelowLarge);
@@ -331,6 +368,11 @@ FramebufferLayout LargeFrameLayout(u32 width, u32 height, bool swapped, bool upr
                            vertical, width, height,
                            Settings::values.screen_bottom_leftright_padding.GetValue(),
                            Settings::values.screen_bottom_topbottom_padding.GetValue());
+    if (vertical) {
+        FillStackedHeight(res.top_screen, Settings::values.screen_top_stretch.GetValue(),
+                          res.bottom_screen, Settings::values.screen_bottom_stretch.GetValue(),
+                          height, gap);
+    }
     if (upright) {
         return reverseLayout(res);
     } else {
