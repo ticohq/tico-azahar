@@ -1,3 +1,17 @@
+diff --git a/src/dynarmic/CMakeLists.txt b/src/dynarmic/CMakeLists.txt
+index b234cd26..47d4c8ca 100644
+--- a/src/dynarmic/CMakeLists.txt
++++ b/src/dynarmic/CMakeLists.txt
+@@ -490,6 +490,9 @@ elseif (UNIX)
+         target_link_libraries(dynarmic PRIVATE rt)
+     endif()
+     target_sources(dynarmic PRIVATE backend/exception_handler_posix.cpp)
++elseif (SWITCH)
++    # Horizon has no signals: the frontend's exception entry hands faults to this one
++    target_sources(dynarmic PRIVATE backend/exception_handler_horizon.cpp)
+ else()
+     target_sources(dynarmic PRIVATE backend/exception_handler_generic.cpp)
+ endif()
 diff --git a/src/dynarmic/backend/arm64/a32_address_space.cpp b/src/dynarmic/backend/arm64/a32_address_space.cpp
 index bbdf925f..720effe5 100644
 --- a/src/dynarmic/backend/arm64/a32_address_space.cpp
@@ -195,6 +209,132 @@ index 47e512f5..7ffd0af6 100644
      return erase_locations;
  }
  
+diff --git a/src/dynarmic/backend/exception_handler_horizon.cpp b/src/dynarmic/backend/exception_handler_horizon.cpp
+new file mode 100644
+index 00000000..557dedfd
+--- /dev/null
++++ b/src/dynarmic/backend/exception_handler_horizon.cpp
+@@ -0,0 +1,120 @@
++// SPDX-FileCopyrightText: Azahar Emulator Project
++// Copyright(c) 2026: PalindromicBreadLoaf(palindromicbreadloaf@tuta.com)
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++// Horizon has no signals. This is a re-implementation of the POSIX SIGSEGV handler overriding
++// libnx's.
++
++#include "dynarmic/backend/exception_handler.h"
++
++#include <algorithm>
++#include <functional>
++#include <memory>
++#include <mutex>
++#include <vector>
++
++#include <mcl/bit_cast.hpp>
++#include <mcl/stdint.hpp>
++
++#include <oaknut/code_block.hpp>
++
++namespace Dynarmic::Backend {
++
++namespace {
++
++struct CodeBlockInfo {
++    u64 code_begin, code_end;
++    std::function<FakeCall(u64)> cb;
++};
++
++class HorizonFaultHandler {
++public:
++    void AddCodeBlock(CodeBlockInfo info) {
++        std::lock_guard<std::mutex> guard(lock);
++        if (const auto iter = Find(info.code_begin); iter != code_block_infos.end()) {
++            code_block_infos.erase(iter);
++        }
++        code_block_infos.push_back(std::move(info));
++    }
++
++    void RemoveCodeBlock(u64 code_begin) {
++        std::lock_guard<std::mutex> guard(lock);
++        const auto iter = Find(code_begin);
++        if (iter == code_block_infos.end()) {
++            return;
++        }
++        code_block_infos.erase(iter);
++    }
++
++    bool Handle(u64 host_pc, u64* new_pc) {
++        std::lock_guard<std::mutex> guard(lock);
++        const auto iter = Find(host_pc);
++        if (iter == code_block_infos.end()) {
++            return false;
++        }
++        const FakeCall fc = iter->cb(host_pc);
++        *new_pc = fc.call_pc;
++        return true;
++    }
++
++private:
++    std::vector<CodeBlockInfo>::iterator Find(u64 host_pc) {
++        return std::find_if(code_block_infos.begin(), code_block_infos.end(), [&](const auto& x) {
++            return x.code_begin <= host_pc && x.code_end > host_pc;
++        });
++    }
++
++    std::mutex lock;
++    std::vector<CodeBlockInfo> code_block_infos;
++};
++
++HorizonFaultHandler g_fault_handler;
++
++}  // namespace
++
++}  // namespace Dynarmic::Backend
++
++// Called by the frontend's replacement __libnx_exception_entry dispatcher, in exception context, on
++// a private per-fault stack. Returns true and fills new_pc when host_pc was a fastmem access this
++// backend owns. False lets the frontend treat the fault as a genuine crash.
++extern "C" bool DynarmicHorizonHandleFastmemFault(std::uint64_t host_pc, std::uint64_t* new_pc) {
++    return Dynarmic::Backend::g_fault_handler.Handle(host_pc, new_pc);
++}
++
++namespace Dynarmic::Backend {
++
++struct ExceptionHandler::Impl final {
++    Impl(u64 code_begin_, u64 code_end_)
++            : code_begin(code_begin_), code_end(code_end_) {}
++
++    ~Impl() {
++        g_fault_handler.RemoveCodeBlock(code_begin);
++    }
++
++    void SetCallback(std::function<FakeCall(u64)> cb) {
++        g_fault_handler.AddCodeBlock({code_begin, code_end, std::move(cb)});
++    }
++
++private:
++    u64 code_begin, code_end;
++};
++
++ExceptionHandler::ExceptionHandler() = default;
++ExceptionHandler::~ExceptionHandler() = default;
++
++void ExceptionHandler::Register(oaknut::CodeBlock& mem, std::size_t size) {
++    // the fault is taken in the executable view, not the one code is written through
++    const u64 code_begin = mcl::bit_cast<u64>(mem.xptr());
++    const u64 code_end = code_begin + size;
++    impl = std::make_unique<Impl>(code_begin, code_end);
++}
++
++bool ExceptionHandler::SupportsFastmem() const noexcept {
++    return static_cast<bool>(impl);
++}
++
++void ExceptionHandler::SetFastmemCallback(std::function<FakeCall(u64)> cb) {
++    impl->SetCallback(std::move(cb));
++}
++
++}  // namespace Dynarmic::Backend
 diff --git a/src/dynarmic/backend/exception_handler_macos.cpp b/src/dynarmic/backend/exception_handler_macos.cpp
 index bac8d9c9..79848208 100644
 --- a/src/dynarmic/backend/exception_handler_macos.cpp

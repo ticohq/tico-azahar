@@ -336,6 +336,7 @@ void MigrateOldKeys() {
 void Apply() {
     const Values values = CurrentValues();
     Settings::values.is_new_3ds.SetValue(GetBool(values, "azahar_new_3ds"));
+    Settings::values.fastmem.SetValue(GetBool(values, "azahar_fastmem"));
     Settings::values.region_value.SetValue(Region(Get(values, "azahar_region")));
     Settings::values.use_virtual_sd.SetValue(GetBool(values, "azahar_use_virtual_sd"));
     Settings::values.use_hw_shader.SetValue(GetBool(values, "azahar_use_hw_shader"));

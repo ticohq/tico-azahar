@@ -484,6 +484,9 @@ struct Values {
 
     // Core
     Setting<bool> use_cpu_jit{true, Keys::use_cpu_jit};
+    // Alias guest RAM into a 4 GiB host arena so the JIT reaches it without a page
+    // table walk. Ignored where no fastmem arena is available (Switch only).
+    Setting<bool> fastmem{true, Keys::fastmem};
     Setting<bool> use_fastinterp{true, Keys::use_fastinterp};
     SwitchableSetting<s32, true> cpu_clock_percentage{100, 5, 400, Keys::cpu_clock_percentage};
     SwitchableSetting<bool> is_new_3ds{true, Keys::is_new_3ds};

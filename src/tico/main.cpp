@@ -1596,26 +1596,6 @@ extern "C" void userAppExit() {
     CloseStartupLog();
 }
 
-extern "C" void __libnx_exception_handler(ThreadExceptionDump* ctx) {
-    WriteRawBootMarker("__libnx_exception_handler: entry");
-    OpenStartupLogIfNeeded("a");
-    if (ctx) {
-        StartupLog("libnx exception: desc=0x%08x pc=0x%016llx lr=0x%016llx sp=0x%016llx far=0x%016llx esr=0x%08x",
-                   static_cast<unsigned>(ctx->error_desc),
-                   static_cast<unsigned long long>(ctx->pc.x),
-                   static_cast<unsigned long long>(ctx->lr.x),
-                   static_cast<unsigned long long>(ctx->sp.x),
-                   static_cast<unsigned long long>(ctx->far.x), static_cast<unsigned>(ctx->esr));
-        StartupLog("libnx exception: x0=0x%016llx x1=0x%016llx x2=0x%016llx x3=0x%016llx",
-                   static_cast<unsigned long long>(ctx->cpu_gprs[0].x),
-                   static_cast<unsigned long long>(ctx->cpu_gprs[1].x),
-                   static_cast<unsigned long long>(ctx->cpu_gprs[2].x),
-                   static_cast<unsigned long long>(ctx->cpu_gprs[3].x));
-    } else {
-        StartupLog("libnx exception: null context");
-    }
-}
-
 int main(int argc, char** argv) {
     WriteRawBootMarker("main: entry");
     OpenStartupLogIfNeeded("a");

@@ -48,6 +48,7 @@ STRINGS = {
                    "Modo boost (CPU 1785 MHz, GPU 768 MHz)", "Mode boost (CPU 1785 MHz, GPU 768 MHz)",
                    "ブーストモード（CPU 1785 MHz、GPU 768 MHz）", "Modo boost (CPU 1785 MHz, GPU 768 MHz)",
                    "Режим ускорения (CPU 1785 МГц, GPU 768 МГц)", "加速模式（CPU 1785 MHz，GPU 768 MHz）"),
+    "fastmem": ("Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem"),
     "cpu_clock": ("CPU Clock", "CPU-Takt", "Reloj de CPU", "Fréquence CPU", "CPUクロック", "Clock da CPU", "Частота ЦП", "CPU 频率"),
     "resolution": ("Internal Resolution", "Interne Auflösung", "Resolución interna", "Résolution interne", "内部解像度", "Resolução interna", "Внутреннее разрешение", "内部分辨率"),
     "use_hw_shader": ("Hardware Shaders", "Hardware-Shader", "Shaders por hardware", "Shaders matériels", "ハードウェアシェーダー", "Shaders por hardware", "Аппаратные шейдеры", "硬件着色器"),
@@ -200,6 +201,7 @@ TABS = [
         ("cpu", [
             option("cpu_clock", "cpu_clock", "enum", "100", choices=CPU_CLOCKS),
             option("boost_mode", "boost_mode", "bool", "true", restart=True),
+            option("fastmem", "fastmem", "bool", "true", restart=True),
         ]),
     ]),
     ("graphics", [

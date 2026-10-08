@@ -111,6 +111,7 @@
     "settings_azahar_disk_shader_cache": "Caché de shaders",
     "settings_azahar_display_size": "Tamaño de pantalla",
     "settings_azahar_dump_textures": "Volcar texturas",
+    "settings_azahar_fastmem": "Fastmem",
     "settings_azahar_graphics": "Gráficos",
     "settings_azahar_language": "Idioma del sistema",
     "settings_azahar_large_screen_proportion": "Proporción de pantalla grande",

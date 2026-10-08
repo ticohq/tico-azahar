@@ -204,6 +204,13 @@
               "type": "bool",
               "default": "true",
               "restart": true
+            },
+            {
+              "key": "azahar_fastmem",
+              "label": "settings_azahar_fastmem",
+              "type": "bool",
+              "default": "true",
+              "restart": true
             }
           ]
         }

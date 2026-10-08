@@ -108,6 +108,7 @@
     "settings_azahar_disk_shader_cache": "Shader-Cache",
     "settings_azahar_display_size": "Anzeigegröße",
     "settings_azahar_dump_textures": "Texturen ausgeben",
+    "settings_azahar_fastmem": "Fastmem",
     "settings_azahar_graphics": "Grafik",
     "settings_azahar_language": "Systemsprache",
     "settings_azahar_large_screen_proportion": "Größe des großen Bildschirms",

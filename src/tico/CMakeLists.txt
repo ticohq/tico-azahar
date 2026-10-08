@@ -7,6 +7,10 @@ add_executable(tico
     emu_window_switch.h
     game_overlay.cpp
     game_overlay.h
+    # libnx's exception entry, replaced: fastmem faults go back to the JIT, crashes are reported
+    horizon_exception.cpp
+    horizon_exception_entry.S
+    horizon_exception_entry.h
     library.cpp
     library.h
     library_screen.cpp

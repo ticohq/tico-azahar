@@ -108,6 +108,7 @@
     "settings_azahar_disk_shader_cache": "Кэш шейдеров",
     "settings_azahar_display_size": "Размер изображения",
     "settings_azahar_dump_textures": "Сохранять текстуры",
+    "settings_azahar_fastmem": "Fastmem",
     "settings_azahar_graphics": "Графика",
     "settings_azahar_language": "Язык системы",
     "settings_azahar_large_screen_proportion": "Пропорция большого экрана",

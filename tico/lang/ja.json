@@ -111,6 +111,7 @@
     "settings_azahar_disk_shader_cache": "シェーダーキャッシュ",
     "settings_azahar_display_size": "表示サイズ",
     "settings_azahar_dump_textures": "テクスチャをダンプ",
+    "settings_azahar_fastmem": "Fastmem",
     "settings_azahar_graphics": "グラフィック",
     "settings_azahar_language": "本体の言語",
     "settings_azahar_large_screen_proportion": "大画面の比率",

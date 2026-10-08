@@ -561,6 +561,15 @@ if ("x86_64" IN_LIST ARCHITECTURE OR "arm64" IN_LIST ARCHITECTURE)
         arm/dynarmic/arm_tick_counts.h
     )
     target_link_libraries(citra_core PRIVATE dynarmic)
+    if (SWITCH)
+        # fastmem: guest RAM aliased into a host arena the JIT reaches directly
+        target_sources(citra_core PRIVATE
+            arm/dynarmic/horizon_arena.cpp
+            arm/dynarmic/horizon_arena.h
+            arm/dynarmic/horizon_fastmem.cpp
+            arm/dynarmic/horizon_fastmem.h
+        )
+    endif()
 endif()
 
 # FastInterp's dispatch loop requires GCC/Clang computed goto; MSVC builds

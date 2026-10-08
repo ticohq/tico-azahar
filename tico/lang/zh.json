@@ -111,6 +111,7 @@
     "settings_azahar_disk_shader_cache": "着色器缓存",
     "settings_azahar_display_size": "显示大小",
     "settings_azahar_dump_textures": "导出纹理",
+    "settings_azahar_fastmem": "Fastmem",
     "settings_azahar_graphics": "图形",
     "settings_azahar_language": "系统语言",
     "settings_azahar_large_screen_proportion": "大屏比例",
