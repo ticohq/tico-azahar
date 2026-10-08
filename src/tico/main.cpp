@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
@@ -36,6 +37,7 @@
 #include "tico/clocks.h"
 #include "tico/emu_window_switch.h"
 #include "tico/game_overlay.h"
+#include "tico/library_screen.h"
 #include "tico/saves.h"
 #include "tico/switch_keyboard.h"
 #include "tico/tico_settings.h"
@@ -84,7 +86,6 @@ constexpr const char* StartupLogPath = "sdmc:/tico/system/3ds/debug/startup.txt"
 constexpr const char* DebugLogPath = "sdmc:/tico/system/3ds/debug/azahar_switch.txt";
 constexpr const char* StdoutLogPath = "sdmc:/tico/system/3ds/debug/stdout.txt";
 constexpr const char* StderrLogPath = "sdmc:/tico/system/3ds/debug/stderr.txt";
-constexpr const char* FallbackRomPath = "sdmc:/tico/system/3ds/game.zcci";
 constexpr const char* MemMapLogPath = "sdmc:/tico/system/3ds/debug/memmap.txt";
 constexpr const char* TicoLauncherPath = "sdmc:/switch/tico/tico.nro";
 // Temporary debug file gates. Flip these back on when collecting detailed boot logs.
@@ -267,6 +268,8 @@ void DebugLog(const char* fmt, ...) {
 // Restart: the NRO starts itself again with the arguments it was given
 bool relaunch = false;
 std::vector<std::string> launch_args;
+// a game picked from the game list goes back to the list
+bool from_library = false;
 
 bool QueueTicoReturn() {
     UsbStorage::Shutdown(); // flush and unmount before tico takes over again
@@ -282,6 +285,10 @@ bool QueueTicoReturn() {
             args += (args.empty() ? "\"" : " \"") + arg + "\"";
         }
         return envSetNextLoad(launch_args.front().c_str(), args.c_str()) == 0;
+    }
+    if (from_library && !launch_args.empty()) {
+        const std::string self = launch_args.front();
+        return envSetNextLoad(self.c_str(), ("\"" + self + "\"").c_str()) == 0;
     }
 
     const char* target = nullptr;
@@ -576,17 +583,19 @@ const char* ResultStatusName(Core::System::ResultStatus status) {
     return "Unknown";
 }
 
+// Added to the arguments of a game picked from the game list, to go back to it.
+constexpr const char* FromLibraryArg = "--from-library";
+
 std::string GetRomPath(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
-        if (!argv[i] || std::strcmp(argv[i], "ticoSetup") == 0) {
+        if (!argv[i] || std::strcmp(argv[i], "ticoSetup") == 0 ||
+            std::strcmp(argv[i], FromLibraryArg) == 0) {
             continue;
         }
         StartupLog("GetRomPath: using argv[%d]=%s", i, argv[i]);
         return argv[i];
     }
-
-    StartupLog("GetRomPath: no argv ROM, using fallback %s", FallbackRomPath);
-    return FallbackRomPath;
+    return {};
 }
 
 std::string TrimTitle(std::string title) {
@@ -658,7 +667,7 @@ std::string CleanTitleFromFilename(const std::string& filename) {
 }
 
 std::string GetDisplayTitle(int argc, char** argv, const std::string& rom_path) {
-    if (argc > 2 && argv[2]) {
+    if (argc > 2 && argv[2] && std::strcmp(argv[2], FromLibraryArg) != 0) {
         std::string title = TrimTitle(argv[2]);
         if (!title.empty()) {
             StartupLog("GetDisplayTitle: using argv[2]=%s", title.c_str());
@@ -1243,16 +1252,36 @@ int Run(int argc, char** argv) {
     for (int i = 0; i < argc; i++) {
         DebugLog("argv[%d]=%s", i, argv[i] ? argv[i] : "(null)");
         launch_args.emplace_back(argv[i] ? argv[i] : "");
+        from_library |= launch_args.back() == FromLibraryArg;
     }
 
     UsbStorage::Init(); // drives mount in the background
 
     StartupLog("Run: parsing ROM path");
     // a game on a USB drive comes as usb://<volume>/<path>
-    const std::string rom_path = UsbStorage::Resolve(GetRomPath(argc, argv));
+    const std::string rom_arg = GetRomPath(argc, argv);
+    if (rom_arg.empty()) {
+        // started without a game (from the homebrew menu): the game list, then
+        // this NRO again with the chosen game
+        romfsInit();
+        const std::optional<std::string> chosen = SwitchFrontend::LibraryScreen::Run();
+        romfsExit();
+        if (chosen && !launch_args.empty()) {
+            // a game on a USB drive goes by the drive's id: its umsN: may change
+            const std::string& self = launch_args.front();
+            const std::string args = "\"" + self + "\" \"" + UsbStorage::ToToken(*chosen) +
+                                     "\" " + FromLibraryArg;
+            envSetNextLoad(self.c_str(), args.c_str());
+        }
+        UsbStorage::Shutdown();
+        DebugClose();
+        appletUnlockExit();
+        return EXIT_SUCCESS;
+    }
+    const std::string rom_path = UsbStorage::Resolve(rom_arg);
     const std::string display_title = GetDisplayTitle(argc, argv, rom_path);
     if (rom_path.empty()) {
-        DebugLog("no ROM path supplied");
+        DebugLog("the USB drive of %s is not connected", rom_arg.c_str());
         thread_core_guard.Restore("no-rom");
         DebugClose();
         const bool queued_tico_return = QueueTicoReturn();

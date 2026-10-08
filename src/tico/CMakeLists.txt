@@ -7,7 +7,12 @@ add_executable(tico
     emu_window_switch.h
     game_overlay.cpp
     game_overlay.h
+    library.cpp
+    library.h
+    library_screen.cpp
+    library_screen.h
     main.cpp
+    overlay_renderer.cpp
     saves.cpp
     saves.h
     switch_keyboard.cpp
@@ -30,6 +35,8 @@ add_executable(tico
     ${TICO_SHARED_DIR}/overlay/tico_config.h
     ${TICO_SHARED_DIR}/overlay/translation_manager.cpp
     ${TICO_SHARED_DIR}/overlay/translation_manager.h
+    # the game list draws through SDL, before Azahar's renderer is up
+    ${PROJECT_SOURCE_DIR}/externals/imgui/imgui/backends/imgui_impl_sdlrenderer2.cpp
 )
 
 create_target_directory_groups(tico)
@@ -37,7 +44,7 @@ set_target_properties(tico PROPERTIES OUTPUT_NAME "azahar-switch.elf")
 target_compile_definitions(tico PRIVATE __SWITCH__)
 
 target_include_directories(tico PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${TICO_SHARED_DIR}
-    ${TICO_SHARED_DIR}/deps/usbhsfs/include)
+    ${TICO_SHARED_DIR}/deps/usbhsfs/include ${DEVKITPRO}/portlibs/switch/include/SDL2)
 
 if(NOT DEVKITPRO)
     if(DEFINED ENV{DEVKITPRO})
@@ -90,6 +97,9 @@ target_link_libraries(tico PRIVATE
     tsl::robin_map
     ${PLATFORM_LIBRARIES}
     Threads::Threads
+    # SDL2 for the game list; switch-dev's is built with its EGL video driver
+    ${DEVKITPRO}/portlibs/switch/lib/libSDL2.a
+    EGL
     GLESv2
     glapi
     ${SWITCH_VULKAN_LIB}

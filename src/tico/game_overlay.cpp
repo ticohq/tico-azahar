@@ -27,7 +27,6 @@
 #include "common/logging/log.h"
 #include "core/core.h"
 #include "overlay/imgui_overlay.h"
-#include "overlay/overlay_renderer.h"
 #include "video_core/gpu.h"
 #include "video_core/renderer_base.h"
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
@@ -692,12 +691,11 @@ Action ConsumeAction() {
 
 } // namespace SwitchFrontend::GameOverlay
 
-// The renderer tico's overlay draws with: ImGui's Vulkan backend, recording into
-// Azahar's present command buffer (see DrawCallback).
-namespace SwitchFrontend::OverlayRenderer {
+// The renderer tico's overlay draws with during a game: ImGui's Vulkan backend,
+// recording into Azahar's present command buffer (see DrawCallback).
+namespace SwitchFrontend::GameOverlay {
 
-bool Init() {
-    using namespace GameOverlay;
+bool RendererInit() {
     if (s_color_format == vk::Format::eUndefined) {
         return false;
     }
@@ -727,8 +725,7 @@ bool Init() {
     return true;
 }
 
-void Shutdown() {
-    using namespace GameOverlay;
+void RendererShutdown() {
     for (auto& [id, texture] : s_textures) {
         DestroyTexture(texture);
     }
@@ -744,8 +741,8 @@ void Shutdown() {
     s_color_format = vk::Format::eUndefined;
 }
 
-void BeginFrame() {
+void RendererBeginFrame() {
     ImGui_ImplVulkan_NewFrame();
 }
 
-} // namespace SwitchFrontend::OverlayRenderer
+} // namespace SwitchFrontend::GameOverlay

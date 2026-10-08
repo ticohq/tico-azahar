@@ -48,4 +48,9 @@ void RequestCheatRefresh();
 // The action the menu returned since the last call, once.
 OverlayUI::Action ConsumeAction();
 
+// The overlay renderer during a game (see overlay_renderer.cpp).
+bool RendererInit();
+void RendererShutdown();
+void RendererBeginFrame();
+
 } // namespace SwitchFrontend::GameOverlay
