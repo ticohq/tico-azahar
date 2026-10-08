@@ -46,9 +46,11 @@ public:
     void Compile(const std::array<u32, MAX_PROGRAM_CODE_LENGTH>* program_code,
                  const std::array<u32, MAX_SWIZZLE_DATA_LENGTH>* swizzle_data);
 
-    // Called by JitEngine after copying compiled code into the shared pool.
-    void FinalizePool(const std::byte* pool_rx_base) {
+    // Called by JitEngine after copying compiled code into the shared pool, whose contents
+    // belong to `generation` until the pool is next emptied.
+    void FinalizePool(const std::byte* pool_rx_base, u64 generation) {
         rx_base = pool_rx_base;
+        pool_generation = generation;
         program = reinterpret_cast<CompiledShader*>(
             const_cast<std::byte*>(rx_base) + m_program_offset);
         code_vec.clear();
@@ -56,6 +58,7 @@ public:
     }
 
     std::size_t GetCompiledSize() const { return code_vec.size() * sizeof(u32); }
+    u64 PoolGeneration() const { return pool_generation; }
     const std::vector<u32>& GetCompiledCode() const { return code_vec; }
 
     void Compile_ADD(Instruction instr);
@@ -93,6 +96,7 @@ private:
     // rx_base and m_program_offset are set by JitEngine via FinalizePool().
     const std::byte* rx_base = nullptr;
     std::size_t m_program_offset = 0;
+    u64 pool_generation = 0;
 
     void Compile_Block(u32 end);
     void Compile_NextInstr();
