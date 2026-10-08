@@ -113,8 +113,8 @@ struct HostBacking {
     }
 };
 
-#ifdef __SWITCH__
-// Keeps a burst of the same error from flooding the log (and freezing the emulator with it).
+// Keeps a burst of the same error from flooding the log (and freezing the emulator with it):
+// a guest that dereferences a wild pointer faults for as long as it keeps walking.
 class LogThrottle {
 public:
     // A value means log, and is the number of occurrences suppressed since the last one logged.
@@ -142,7 +142,6 @@ private:
     u32 logged_in_window = 0;
     u64 suppressed = 0;
 };
-#endif
 
 } // namespace
 
@@ -220,6 +219,8 @@ public:
     std::shared_ptr<BackingMem> dsp_mem;
 
     PAddr plugin_fb_address{};
+
+    LogThrottle unmapped_log_throttle;
 
 #ifdef __SWITCH__
     // Guest fastmem arena (Switch only). One 4 GiB host reservation whose pages mirror the guest
@@ -914,6 +915,17 @@ void MemorySystem::UnregisterPageTable(std::shared_ptr<PageTable> page_table) {
 
 template <typename T>
 void MemorySystem::UnmappedAccess(const VAddr vaddr, const T value, bool read) {
+    bool debugging = Settings::values.enable_exception_handler.GetValue();
+#ifdef ENABLE_GDBSTUB
+    debugging = debugging || GDBStub::IsConnected();
+#endif
+    // Debugging sees every access; otherwise only a bounded number are logged.
+    const auto suppressed =
+        debugging ? std::optional<u64>{0} : impl->unmapped_log_throttle.Acquire();
+    if (!suppressed) {
+        return;
+    }
+
     const std::string mode = (read ? "Read" : "Write");
     const std::string value_str = read ? std::string("") : fmt::format(" 0x{:08X}", value);
     const std::string message = fmt::format("unmapped {}{}{} @ 0x{:08X} at PC 0x{:08X}", mode,
@@ -923,7 +935,11 @@ void MemorySystem::UnmappedAccess(const VAddr vaddr, const T value, bool read) {
         GDBStub::Break(SIGSEGV);
     }
 #endif
-    LOG_ERROR(HW_Memory, "{}", message);
+    if (*suppressed != 0) {
+        LOG_ERROR(HW_Memory, "{} (+{} suppressed)", message, *suppressed);
+    } else {
+        LOG_ERROR(HW_Memory, "{}", message);
+    }
     if (Settings::values.enable_exception_handler) {
         Core::LogException(impl->system, read ? Core::ExceptionType::UnmappedRead
                                               : Core::ExceptionType::UnmappedWrite);
