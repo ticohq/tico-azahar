@@ -98,6 +98,7 @@
     "settings_azahar_async_shaders": "Асинхронные шейдеры",
     "settings_azahar_audio": "Звук",
     "settings_azahar_audio_stretching": "Растяжение звука",
+    "settings_azahar_boost_mode": "Режим ускорения (CPU 1785 МГц, GPU 768 МГц)",
     "settings_azahar_button_mapping": "Назначение кнопок",
     "settings_azahar_console": "Консоль",
     "settings_azahar_controls": "Управление",

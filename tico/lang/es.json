@@ -101,6 +101,7 @@
     "settings_azahar_async_shaders": "Shaders asíncronos",
     "settings_azahar_audio": "Audio",
     "settings_azahar_audio_stretching": "Estiramiento de audio",
+    "settings_azahar_boost_mode": "Modo boost (CPU 1785 MHz, GPU 768 MHz)",
     "settings_azahar_button_mapping": "Asignación de botones",
     "settings_azahar_console": "Consola",
     "settings_azahar_controls": "Controles",

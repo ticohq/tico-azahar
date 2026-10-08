@@ -1,6 +1,8 @@
 set(TICO_SHARED_DIR ${PROJECT_SOURCE_DIR}/tico)
 
 add_executable(tico
+    clocks.cpp
+    clocks.h
     emu_window_switch.cpp
     emu_window_switch.h
     game_overlay.cpp

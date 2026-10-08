@@ -101,6 +101,7 @@
     "settings_azahar_async_shaders": "异步着色器",
     "settings_azahar_audio": "音频",
     "settings_azahar_audio_stretching": "音频拉伸",
+    "settings_azahar_boost_mode": "加速模式（CPU 1785 MHz，GPU 768 MHz）",
     "settings_azahar_button_mapping": "按键映射",
     "settings_azahar_console": "主机",
     "settings_azahar_controls": "控制",

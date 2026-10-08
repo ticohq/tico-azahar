@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cctype>
 #include <csignal>
@@ -16,6 +17,7 @@
 #include <cstring>
 #include <ctime>
 #include <exception>
+#include <pthread.h>
 #include <fcntl.h>
 #include <iterator>
 #include <memory>
@@ -31,6 +33,7 @@
 #include "overlay/overlay_ui.h"
 #include "overlay/tico_config.h"
 #include "overlay/translation_manager.h"
+#include "tico/clocks.h"
 #include "tico/emu_window_switch.h"
 #include "tico/game_overlay.h"
 #include "tico/saves.h"
@@ -267,6 +270,7 @@ std::vector<std::string> launch_args;
 
 bool QueueTicoReturn() {
     UsbStorage::Shutdown(); // flush and unmount before tico takes over again
+    SwitchFrontend::Clocks::Restore();
     if (!envHasNextLoad()) {
         StartupLog("QueueTicoReturn: loader does not support envSetNextLoad");
         return false;
@@ -929,6 +933,54 @@ void WriteAutoSave(Core::System& system) {
     DebugLog("auto save %s", written ? "written" : "failed");
 }
 
+// Closed from the HOME menu: the app is in the background, where the system
+// doesn't run its GPU work, so the emulation can't be stopped (its shutdown
+// waits on the GPU). The auto save gets a few seconds on a worker (states are
+// written to a temporary file first, so one cut short never replaces the last),
+// the drives and clocks are given back, and the system, which waits on the
+// exit lock, is let go on with closing the app.
+[[noreturn]] void LeaveForSystemExit(Core::System& system) {
+    DebugLog("closed by the system: saving and leaving without stopping the emulation");
+    // A save state needs a deep stack (its stream buffers alone are 128 KiB): the worker gets
+    // 4 MiB, where a default thread's would overflow.
+    struct ExitSave {
+        Core::System* system;
+        std::atomic<bool> done{false};
+    };
+    static ExitSave exit_save{&system};
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, 4 * 1024 * 1024);
+    pthread_t worker;
+    const bool started =
+        pthread_create(&worker, &attr,
+                       [](void* arg) -> void* {
+                           auto* save = static_cast<ExitSave*>(arg);
+                           WriteAutoSave(*save->system);
+                           save->done.store(true);
+                           return nullptr;
+                       },
+                       &exit_save) == 0;
+    pthread_attr_destroy(&attr);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    while (started && !exit_save.done.load() && std::chrono::steady_clock::now() < deadline) {
+        svcSleepThread(10'000'000LL);
+    }
+    if (started && !exit_save.done.load()) {
+        DebugLog("auto save still running at exit");
+    }
+    UsbStorage::Shutdown();
+    SwitchFrontend::Clocks::Restore();
+    DebugClose();
+    std::fflush(nullptr);
+    // ending the process ourselves would look like a crash to the system:
+    // unlocked, it ends the app itself, with every thread in it
+    appletUnlockExit();
+    while (true) {
+        svcSleepThread(1'000'000'000LL);
+    }
+}
+
 // Left by Restart: the relaunched game starts over instead of offering the auto save.
 std::string RestartMarkerPath() {
     return SwitchFrontend::Saves::StatePath(game_title_id, SwitchFrontend::OverlayUI::kAutoStateSlot) +
@@ -973,7 +1025,7 @@ bool ShowControllerOrder() {
     arg.hdr.player_count_min = 0;
     arg.hdr.player_count_max = 1;
     HidLaControllerSupportResultInfo info{};
-    return R_SUCCEEDED(hidLaShowControllerSupport(&info, &arg));
+    return hidLaShowControllerSupport(&info, &arg) == 0;
 }
 
 void ConfigureOverlay(Core::System& system, const std::string& display_title) {
@@ -1094,7 +1146,7 @@ void EditTextOption() {
         return;
     }
     SwkbdConfig keyboard;
-    if (R_FAILED(swkbdCreate(&keyboard, 0))) {
+    if (swkbdCreate(&keyboard, 0) != 0) {
         return;
     }
     const std::string current = SwitchFrontend::TicoConfig::GetOptionValue(*option);
@@ -1106,7 +1158,7 @@ void EditTextOption() {
         swkbdConfigSetStringLenMax(&keyboard, static_cast<u32>(option->max_length));
     }
     char typed[512] = {};
-    if (R_SUCCEEDED(swkbdShow(&keyboard, typed, sizeof(typed)))) {
+    if (swkbdShow(&keyboard, typed, sizeof(typed)) == 0) {
         SwitchFrontend::TicoConfig::SetOptionValue(*option, typed);
         OverlayUI::NotifyOptionEdited(*option);
     }
@@ -1230,6 +1282,9 @@ int Run(int argc, char** argv) {
     SwitchFrontend::TicoSettings::MigrateOldKeys();
     SwitchFrontend::TicoConfig::SetGame(rom_path);
     SwitchFrontend::TicoSettings::Apply();
+    if (SwitchFrontend::TicoConfig::GetConfigValue("azahar_boost_mode", "true") == "true") {
+        SwitchFrontend::Clocks::Boost();
+    }
     DebugLog("tico config applied: path=%s options=%zu game_settings=%d res=%u",
              SwitchFrontend::TicoConfig::GetLoadedConfigPath().c_str(),
              SwitchFrontend::TicoConfig::GetLoadedOptionCount(),
@@ -1310,10 +1365,7 @@ int Run(int argc, char** argv) {
         const auto now = Clock::now();
         applet_loop_active = PumpAppletMessages();
         if (!applet_loop_active) {
-            exit_reason = "applet message requested exit";
-            DebugLog("main loop exit: applet message requested exit after %llu iterations",
-                     static_cast<unsigned long long>(loop_count));
-            break;
+            LeaveForSystemExit(system);
         }
         if (!system.IsPoweredOn()) {
             exit_reason = "system powered off before RunLoop";
@@ -1338,6 +1390,7 @@ int Run(int argc, char** argv) {
             last_keepalive = now;
         }
 
+        SwitchFrontend::Clocks::Keep();
         window.PollEvents();
         InputCommon::SwitchHID::Update();
         padUpdate(&pad);

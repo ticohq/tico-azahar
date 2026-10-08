@@ -197,6 +197,13 @@
                   "value": "400"
                 }
               ]
+            },
+            {
+              "key": "azahar_boost_mode",
+              "label": "settings_azahar_boost_mode",
+              "type": "bool",
+              "default": "true",
+              "restart": true
             }
           ]
         }

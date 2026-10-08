@@ -44,6 +44,10 @@ STRINGS = {
     "language": ("System Language", "Systemsprache", "Idioma del sistema", "Langue du système", "本体の言語", "Idioma do sistema", "Язык системы", "系统语言"),
     "username": ("Username", "Benutzername", "Nombre de usuario", "Nom d'utilisateur", "ユーザー名", "Nome de usuário", "Имя пользователя", "用户名"),
     "use_virtual_sd": ("Virtual SD Card", "Virtuelle SD-Karte", "Tarjeta SD virtual", "Carte SD virtuelle", "仮想SDカード", "Cartão SD virtual", "Виртуальная SD-карта", "虚拟SD卡"),
+    "boost_mode": ("Boost mode (CPU 1785 MHz, GPU 768 MHz)", "Boost-Modus (CPU 1785 MHz, GPU 768 MHz)",
+                   "Modo boost (CPU 1785 MHz, GPU 768 MHz)", "Mode boost (CPU 1785 MHz, GPU 768 MHz)",
+                   "ブーストモード（CPU 1785 MHz、GPU 768 MHz）", "Modo boost (CPU 1785 MHz, GPU 768 MHz)",
+                   "Режим ускорения (CPU 1785 МГц, GPU 768 МГц)", "加速模式（CPU 1785 MHz，GPU 768 MHz）"),
     "cpu_clock": ("CPU Clock", "CPU-Takt", "Reloj de CPU", "Fréquence CPU", "CPUクロック", "Clock da CPU", "Частота ЦП", "CPU 频率"),
     "resolution": ("Internal Resolution", "Interne Auflösung", "Resolución interna", "Résolution interne", "内部解像度", "Resolução interna", "Внутреннее разрешение", "内部分辨率"),
     "use_hw_shader": ("Hardware Shaders", "Hardware-Shader", "Shaders por hardware", "Shaders matériels", "ハードウェアシェーダー", "Shaders por hardware", "Аппаратные шейдеры", "硬件着色器"),
@@ -195,6 +199,7 @@ TABS = [
         ]),
         ("cpu", [
             option("cpu_clock", "cpu_clock", "enum", "100", choices=CPU_CLOCKS),
+            option("boost_mode", "boost_mode", "bool", "true", restart=True),
         ]),
     ]),
     ("graphics", [
