@@ -64,7 +64,8 @@ Azahar website - [https://azahar-emu.org](https://azahar-emu.org/)
 
 The Switch port also builds on other Switch ports:
 
-- **[dekopon](https://github.com/PalindromicBreadLoaf/dekopon)** by @PalindromicBreadLoaf: fastmem, the GPU thread, JIT and shader fixes, frame generation and more
+- **[dekopon](https://github.com/PalindromicBreadLoaf/dekopon)** by @PalindromicBreadLoaf: fastmem, the GPU thread, JIT and shader fixes, bringing frame generation to Azahar, and more
+- **[dolphin-nx](https://github.com/NaGaa95/dolphin-nx)** by @NaGaa95: frame generation (LSFG) on Switch
 - **[raikopon](https://github.com/Raibatsu/raikopon)** by @Raibatsu: the background shader JIT and the speed hacks, through dekopon
 - **[ARMSX2-NX](https://github.com/PalindromicBreadLoaf/ARMSX2-NX)** and **[nezumiiruka](https://github.com/PalindromicBreadLoaf/nezumiiruka)** by @PalindromicBreadLoaf: the memory aliasing behind fastmem
 - **[lsfg-vk](https://github.com/PancakeTAS/lsfg-vk)** by @PancakeTAS: the frame generation backend
