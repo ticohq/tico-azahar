@@ -311,6 +311,8 @@ void ApplyLiveValues(const Values& values) {
         Settings::values.resolution_factor.SetValue(static_cast<u32>(std::clamp(*factor, 1, 10)));
     }
     Settings::values.use_vsync.SetValue(GetBool(values, "azahar_vsync"));
+    Settings::values.show_shader_compile_notice.SetValue(
+        GetBool(values, "azahar_shader_notice"));
     Settings::values.simulate_3ds_gpu_timings.SetValue(
         GetBool(values, "azahar_simulate_gpu_timings"));
     Settings::values.disable_right_eye_render.SetValue(!GetBool(values, "azahar_right_eye"));

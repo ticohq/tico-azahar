@@ -16,6 +16,7 @@
 #include "video_core/shader/generator/glsl_shader_gen.h"
 #include "video_core/shader/generator/shader_gen.h"
 #include "video_core/shader/generator/spv_fs_shader_gen.h"
+#include "video_core/video_core.h"
 
 #define MALFORMED_DISK_CACHE                                                                       \
     do {                                                                                           \
@@ -123,12 +124,14 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseProgrammableVer
 
             shader.program = std::move(program);
             const vk::Device device = parent.instance.GetDevice();
+            VideoCore::NotifyShaderCompileBegin();
             parent.shader_workers.QueueWork([device, &shader, this, spirv_id] {
                 auto spirv = CompileGLSL(shader.program, vk::ShaderStageFlagBits::eVertex);
                 AppendVSSPIRV(vs_cache, spirv, spirv_id);
                 shader.program.clear();
                 shader.module = CompileSPV(spirv, device);
                 shader.MarkDone();
+                VideoCore::NotifyShaderCompileEnd();
             });
         }
 
@@ -158,6 +161,7 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseFragmentShader(
     if (new_shader) {
         LOG_NEW_OBJECT(Render_Vulkan, "New FS config {:016X}", fs_config_hash);
 
+        VideoCore::NotifyShaderCompileBegin();
         parent.shader_workers.QueueWork([fs_config, user, this, &shader, fs_config_hash]() {
             std::vector<u32> spirv;
             const bool use_spirv = parent.profile.vk_use_spirv_generator;
@@ -179,6 +183,7 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseFragmentShader(
                                     .fs_config = fs_config};
                 AppendFSConfig(fs_cache, entry, fs_config_hash);
             }
+            VideoCore::NotifyShaderCompileEnd();
         });
     }
 
@@ -213,6 +218,7 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseFixedGeometrySh
         if (new_shader) {
             LOG_NEW_OBJECT(Render_Vulkan, "New GS config {:016X}", gs_config_hash);
 
+            VideoCore::NotifyShaderCompileBegin();
             parent.shader_workers.QueueWork([gs_config, this, &shader, gs_config_hash]() {
                 ExtraFixedGSConfig extra;
                 extra.use_clip_planes = parent.profile.has_clip_planes;
@@ -229,6 +235,7 @@ std::optional<std::pair<u64, Shader* const>> ShaderDiskCache::UseFixedGeometrySh
                     .gs_config = gs_config,
                 };
                 AppendGSConfig(gs_cache, entry, gs_config_hash);
+                VideoCore::NotifyShaderCompileEnd();
             });
         }
 

@@ -567,6 +567,8 @@ struct Values {
     SwitchableSetting<bool> use_display_refresh_rate_detection{
         true, Keys::use_display_refresh_rate_detection};
     Setting<bool> use_shader_jit{true, Keys::use_shader_jit};
+    // Draws a "Compiling shaders" notice while shaders are being built.
+    Setting<bool> show_shader_compile_notice{false, Keys::show_shader_compile_notice};
     SwitchableSetting<u32, true> resolution_factor{1, 0, 18, Keys::resolution_factor};
     SwitchableSetting<bool> use_integer_scaling{false, Keys::use_integer_scaling};
     SwitchableSetting<double, true> frame_limit{100, 0, 1000, Keys::frame_limit};

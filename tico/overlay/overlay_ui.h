@@ -270,6 +270,9 @@ struct HudStats {
     int rendered_width = 0;
     int rendered_height = 0;
     bool fast_forward = false;
+    // a short status line drawn on its own, bottom left (e.g. "Compiling shaders");
+    // empty when there is none
+    std::string notice;
 };
 void SetHudStats(const HudStats& stats);
 // Re-reads the HUD positions from the config; call once it has been loaded.

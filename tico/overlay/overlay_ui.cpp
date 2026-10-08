@@ -2149,11 +2149,29 @@ void RenderHud(ImDrawList* dl, ImVec2 display_size) {
         dl->AddText(font, font_size, ImVec2(p0.x + pad_x, p0.y + pad_y),
                     IM_COL32(255, 255, 255, 230), line.c_str());
     }
+
+    // the notice sits bottom left, above that corner's line when there is one
+    if (!stats.notice.empty()) {
+        const ImVec2 text_size =
+            font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, stats.notice.c_str());
+        const float box_w = text_size.x + (pad_x * 2.0f);
+        const float box_h = text_size.y + (pad_y * 2.0f);
+        float bottom = display_size.y - margin;
+        if (!lines[3].empty()) {
+            bottom -= box_h + (6.0f * scale);
+        }
+        const ImVec2 p0(margin, bottom - box_h);
+        dl->AddRectFilled(p0, ImVec2(p0.x + box_w, p0.y + box_h), IM_COL32(0, 0, 0, 140),
+                          8.0f * scale);
+        dl->AddText(font, font_size, ImVec2(p0.x + pad_x, p0.y + pad_y),
+                    IM_COL32(255, 210, 90, 240), stats.notice.c_str());
+    }
 }
 
 bool HudActive() {
     std::lock_guard lock(s_hud_mutex);
-    return s_fps_position > 0 || s_resolution_position > 0 || s_hud_stats.fast_forward;
+    return s_fps_position > 0 || s_resolution_position > 0 || s_hud_stats.fast_forward ||
+           !s_hud_stats.notice.empty();
 }
 
 void OpenScreen(MenuScreen screen) {

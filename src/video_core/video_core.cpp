@@ -2,6 +2,8 @@
 // Licensed under GPLv2 or any later version
 // Refer to the misc/licenses/gplv2.txt file included.
 
+#include <atomic>
+
 #include "common/logging/log.h"
 #include "common/settings.h"
 #include "video_core/gpu.h"
@@ -21,6 +23,10 @@
 #endif
 
 namespace VideoCore {
+
+namespace {
+std::atomic<u32> s_pending_shader_compiles{0};
+} // namespace
 
 std::unique_ptr<RendererBase> CreateRenderer(Frontend::EmuWindow& emu_window,
                                              Frontend::EmuWindow* secondary_window,
@@ -60,6 +66,18 @@ std::unique_ptr<RendererBase> CreateRenderer(Frontend::EmuWindow& emu_window,
 #error "At least one renderer must be enabled."
 #endif
     }
+}
+
+void NotifyShaderCompileBegin() {
+    s_pending_shader_compiles.fetch_add(1, std::memory_order_relaxed);
+}
+
+void NotifyShaderCompileEnd() {
+    s_pending_shader_compiles.fetch_sub(1, std::memory_order_relaxed);
+}
+
+u32 GetPendingShaderCompiles() {
+    return s_pending_shader_compiles.load(std::memory_order_relaxed);
 }
 
 } // namespace VideoCore

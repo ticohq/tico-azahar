@@ -313,6 +313,12 @@
               "restart": true
             },
             {
+              "key": "azahar_shader_notice",
+              "label": "settings_azahar_shader_notice",
+              "type": "bool",
+              "default": "false"
+            },
+            {
               "key": "azahar_vsync",
               "label": "settings_azahar_vsync",
               "type": "bool",

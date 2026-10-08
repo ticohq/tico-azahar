@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "common/common_types.h"
+
 namespace Frontend {
 class EmuWindow;
 }
@@ -25,5 +27,11 @@ class RendererBase;
 std::unique_ptr<RendererBase> CreateRenderer(Frontend::EmuWindow& emu_window,
                                              Frontend::EmuWindow* secondary_window,
                                              Pica::PicaCore& pica, Core::System& system);
+
+// Shader and pipeline builds handed to the compile workers and not yet done, for the
+// frontend's "Compiling shaders" notice.
+void NotifyShaderCompileBegin();
+void NotifyShaderCompileEnd();
+u32 GetPendingShaderCompiles();
 
 } // namespace VideoCore

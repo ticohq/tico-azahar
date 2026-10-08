@@ -12,6 +12,7 @@
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_render_manager.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
+#include "video_core/video_core.h"
 
 namespace Vulkan {
 
@@ -106,7 +107,11 @@ bool GraphicsPipeline::TryBuild(bool wait_built) {
     }
 
     // Fallback to (a)synchronous compilation
-    worker->QueueWork([this] { Build(); });
+    VideoCore::NotifyShaderCompileBegin();
+    worker->QueueWork([this] {
+        Build();
+        VideoCore::NotifyShaderCompileEnd();
+    });
     is_pending = true;
     return wait_built;
 }

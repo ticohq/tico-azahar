@@ -49,6 +49,7 @@ foreach(KEY IN ITEMS
     "use_skip_duplicate_frames"
     "use_display_refresh_rate_detection"
     "use_shader_jit"
+    "show_shader_compile_notice"
     "resolution_factor"
     "frame_limit"
     "turbo_limit"

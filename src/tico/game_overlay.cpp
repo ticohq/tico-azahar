@@ -14,6 +14,7 @@
 #include <cstring>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -28,12 +29,14 @@
 #include "common/settings.h"
 #include "core/core.h"
 #include "overlay/imgui_overlay.h"
+#include "overlay/translation_manager.h"
 #include "video_core/gpu.h"
 #include "video_core/renderer_base.h"
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_present_window.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
+#include "video_core/video_core.h"
 
 namespace SwitchFrontend::GameOverlay {
 namespace {
@@ -92,6 +95,8 @@ bool s_failed = false;
 bool s_shown = false;
 bool s_backend_ready = false;
 std::chrono::steady_clock::time_point s_last_frame;
+// how long the "Compiling shaders" notice stays up (present thread only)
+std::chrono::steady_clock::time_point s_shader_notice_until;
 vk::Format s_color_format = vk::Format::eUndefined;
 vk::RenderPass s_render_pass;
 
@@ -401,6 +406,18 @@ void PublishHudStats() {
     if (const u32 scale = Settings::values.resolution_factor.GetValue(); scale != 0) {
         stats.rendered_width = static_cast<int>(400 * scale);
         stats.rendered_height = static_cast<int>(240 * scale);
+    }
+    // kept up a moment after the last build so it can be read
+    const auto now = std::chrono::steady_clock::now();
+    const u32 pending = VideoCore::GetPendingShaderCompiles();
+    if (pending > 0) {
+        s_shader_notice_until = now + std::chrono::milliseconds(500);
+    }
+    if (Settings::values.show_shader_compile_notice.GetValue() && now < s_shader_notice_until) {
+        stats.notice = OverlayTranslation::tr("settings_azahar_compiling_shaders");
+        if (pending > 0) {
+            stats.notice += "  " + std::to_string(pending);
+        }
     }
     OverlayUI::SetHudStats(stats);
 }
