@@ -155,13 +155,18 @@ void PipelineCache::BuildLayout() {
 }
 
 PipelineCache::~PipelineCache() {
-    pipeline_workers.WaitForRequests();
-    shader_workers.WaitForRequests();
+    WaitForCompileWorkers();
     SaveDriverPipelineDiskCache();
+}
+
+void PipelineCache::WaitForCompileWorkers() {
+    shader_workers.WaitForRequests();
+    pipeline_workers.WaitForRequests();
 }
 
 void PipelineCache::LoadCache(const std::atomic_bool& stop_loading,
                               const VideoCore::DiskResourceLoadCallback& callback) {
+    WaitForCompileWorkers();
     LoadDriverPipelineDiskCache(stop_loading, callback);
     LoadDiskCache(stop_loading, callback);
 }
@@ -174,6 +179,11 @@ void PipelineCache::SwitchCache(u64 title_id, const std::atomic_bool& stop_loadi
                   title_id);
         return;
     }
+
+    // GraphicsPipeline jobs retain pointers into the current ShaderDiskCache and a raw handle to
+    // driver_pipeline_cache. Finish them before replacing the driver cache or allowing
+    // SwitchDiskCache to erase the old manager.
+    WaitForCompileWorkers();
 
     // Make sure we have a valid pipeline cache before switching
     if (!driver_pipeline_cache) {

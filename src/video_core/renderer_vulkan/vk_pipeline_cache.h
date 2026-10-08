@@ -102,6 +102,9 @@ public:
     }
 
 private:
+    /// Blocks until every queued shader and pipeline compile has finished.
+    void WaitForCompileWorkers();
+
     friend ShaderDiskCache;
 
     /// Loads the driver pipeline cache
