@@ -388,6 +388,34 @@
               ]
             },
             {
+              "key": "azahar_anisotropic_filtering",
+              "label": "settings_azahar_anisotropic_filtering",
+              "type": "enum",
+              "default": "16x",
+              "choices": [
+                {
+                  "label": "Off",
+                  "value": "1x"
+                },
+                {
+                  "label": "2x",
+                  "value": "2x"
+                },
+                {
+                  "label": "4x",
+                  "value": "4x"
+                },
+                {
+                  "label": "8x",
+                  "value": "8x"
+                },
+                {
+                  "label": "16x",
+                  "value": "16x"
+                }
+              ]
+            },
+            {
               "key": "azahar_custom_textures",
               "label": "settings_azahar_custom_textures",
               "type": "bool",

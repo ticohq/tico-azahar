@@ -1534,7 +1534,6 @@ Sampler::Sampler(TextureRuntime& runtime, const VideoCore::SamplerParams& params
     using TextureConfig = VideoCore::SamplerParams::TextureConfig;
 
     const Instance& instance = runtime.GetInstance();
-    const vk::PhysicalDeviceProperties properties = instance.GetPhysicalDevice().getProperties();
     const bool use_border_color =
         instance.IsCustomBorderColorSupported() && (params.wrap_s == TextureConfig::ClampToBorder ||
                                                     params.wrap_t == TextureConfig::ClampToBorder);
@@ -1552,6 +1551,10 @@ Sampler::Sampler(TextureRuntime& runtime, const VideoCore::SamplerParams& params
     const vk::SamplerAddressMode wrap_v = PicaToVK::WrapMode(params.wrap_t);
     const float lod_min = static_cast<float>(params.lod_min);
     const float lod_max = static_cast<float>(params.lod_max);
+    const float anisotropy = instance.IsAnisotropicFilteringSupported()
+                                 ? std::min(static_cast<float>(params.anisotropy),
+                                            instance.MaxSamplerAnisotropy())
+                                 : 1.0f;
 
     // Do not apply anisotropic filtering if nearest filtering is used at all, as drivers
     // are only recommended (not enforced) to follow the mag/min filter in such cases.
@@ -1569,8 +1572,8 @@ Sampler::Sampler(TextureRuntime& runtime, const VideoCore::SamplerParams& params
         .addressModeU = wrap_u,
         .addressModeV = wrap_v,
         .mipLodBias = 0,
-        .anisotropyEnable = use_anisotropy,
-        .maxAnisotropy = use_anisotropy ? properties.limits.maxSamplerAnisotropy : 1.0f,
+        .anisotropyEnable = use_anisotropy && anisotropy > 1.0f,
+        .maxAnisotropy = use_anisotropy ? anisotropy : 1.0f,
         .compareEnable = false,
         .compareOp = vk::CompareOp::eAlways,
         .minLod = lod_min,

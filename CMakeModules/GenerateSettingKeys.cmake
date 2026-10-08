@@ -54,6 +54,7 @@ foreach(KEY IN ITEMS
     "turbo_limit"
     "texture_filter"
     "texture_sampling"
+    "anisotropic_filtering"
     "delay_game_render_thread_us"
     "simulate_3ds_gpu_timings"
     "layout_option"

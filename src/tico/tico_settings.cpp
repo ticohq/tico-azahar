@@ -179,6 +179,23 @@ Settings::TextureSampling TextureSampling(std::string_view value) {
     return Settings::TextureSampling::GameControlled;
 }
 
+Settings::AnisotropicFiltering Anisotropy(std::string_view value) {
+    using A = Settings::AnisotropicFiltering;
+    if (value == "1x") {
+        return A::Off;
+    }
+    if (value == "2x") {
+        return A::X2;
+    }
+    if (value == "4x") {
+        return A::X4;
+    }
+    if (value == "8x") {
+        return A::X8;
+    }
+    return A::X16;
+}
+
 // The layout, and which side the small screen sits on for the inverted ones.
 void ApplyLayout(std::string_view value) {
     using L = Settings::LayoutOption;
@@ -300,6 +317,8 @@ void ApplyLiveValues(const Values& values) {
     Settings::values.texture_filter.SetValue(TextureFilter(Get(values, "azahar_texture_filter")));
     Settings::values.texture_sampling.SetValue(
         TextureSampling(Get(values, "azahar_texture_sampling")));
+    Settings::values.anisotropic_filtering.SetValue(
+        Anisotropy(Get(values, "azahar_anisotropic_filtering")));
 
     ApplyLayout(Get(values, "azahar_layout"));
     if (const auto proportion = GetFloat(values, "azahar_large_screen_proportion")) {
