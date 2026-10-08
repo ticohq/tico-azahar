@@ -710,6 +710,10 @@
                   "value": "Stretch"
                 },
                 {
+                  "label": "Stretch Main Screen",
+                  "value": "StretchMain"
+                },
+                {
                   "label": "Original",
                   "value": "Original"
                 }

@@ -799,6 +799,13 @@ void ToggleSwapScreens() {
     const bool current = Settings::values.swap_screen.GetValue();
     const bool next = !current;
     Settings::values.swap_screen.SetValue(next);
+    // with Stretch Main Screen, the stretch moves to the new main screen
+    const bool top_stretch = Settings::values.screen_top_stretch.GetValue();
+    const bool bottom_stretch = Settings::values.screen_bottom_stretch.GetValue();
+    if (top_stretch != bottom_stretch) {
+        Settings::values.screen_top_stretch.SetValue(bottom_stretch);
+        Settings::values.screen_bottom_stretch.SetValue(top_stretch);
+    }
     Core::System::GetInstance().GPU().UpdateCurrentFramebufferLayout();
     SwitchFrontend::TicoConfig::SetConfigValue("azahar_swap_screens", next ? "true" : "false");
     SwitchFrontend::TicoConfig::SaveConfig();

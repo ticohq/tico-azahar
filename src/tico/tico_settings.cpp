@@ -223,14 +223,18 @@ void ApplyOrientation(std::string_view value) {
     Settings::values.screen_rotation_180.SetValue(value.ends_with("_inverted"));
 }
 
-void ApplyDisplaySize(std::string_view value) {
+// Stretch fills the screen with both screens; Stretch Main Screen only the main one
+// (the top screen, the bottom one when they are swapped), the other keeping its size.
+void ApplyDisplaySize(std::string_view value, bool swapped) {
     const bool stretch = value == "Stretch";
-    Settings::values.aspect_ratio.SetValue(stretch ? Settings::AspectRatio::Stretch
-                                                   : Settings::AspectRatio::Default);
+    const bool stretch_main = value == "StretchMain";
+    Settings::values.aspect_ratio.SetValue(stretch || stretch_main
+                                               ? Settings::AspectRatio::Stretch
+                                               : Settings::AspectRatio::Default);
     Settings::values.use_integer_scaling.SetValue(value == "Original");
-    Settings::values.screen_top_stretch.SetValue(stretch);
-    Settings::values.screen_bottom_stretch.SetValue(stretch);
-    if (stretch) {
+    Settings::values.screen_top_stretch.SetValue(stretch || (stretch_main && !swapped));
+    Settings::values.screen_bottom_stretch.SetValue(stretch || (stretch_main && swapped));
+    if (stretch || stretch_main) {
         Settings::values.screen_top_leftright_padding.SetValue(0);
         Settings::values.screen_top_topbottom_padding.SetValue(0);
         Settings::values.screen_bottom_leftright_padding.SetValue(0);
@@ -344,7 +348,7 @@ void ApplyLiveValues(const Values& values) {
         Settings::values.large_screen_proportion.SetValue(std::clamp(*proportion, 1.0f, 16.0f));
     }
     ApplyOrientation(Get(values, "azahar_orientation"));
-    ApplyDisplaySize(Get(values, "azahar_display_size"));
+    ApplyDisplaySize(Get(values, "azahar_display_size"), GetBool(values, "azahar_swap_screens"));
     Settings::values.swap_screen.SetValue(GetBool(values, "azahar_swap_screens"));
 
     if (const auto volume = GetInt(values, "azahar_volume")) {
