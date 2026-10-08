@@ -129,16 +129,19 @@ RasterizerAccelerated::VertexArrayInfo RasterizerAccelerated::AnalyzeVertexArray
     }
 
     const u32 vertex_num = vertex_max - vertex_min + 1;
+    return {vertex_min, vertex_max, VertexInputSize(vertex_num, stride_alignment)};
+}
+
+u32 RasterizerAccelerated::VertexInputSize(u32 vertex_num, u32 stride_alignment) const {
     u32 vs_input_size = 0;
-    for (const auto& loader : vertex_attributes.attribute_loaders) {
+    for (const auto& loader : regs.pipeline.vertex_attributes.attribute_loaders) {
         if (loader.component_count != 0) {
             const u32 aligned_stride =
                 Common::AlignUp(static_cast<u32>(loader.byte_count), stride_alignment);
             vs_input_size += Common::AlignUp(aligned_stride * vertex_num, 4);
         }
     }
-
-    return {vertex_min, vertex_max, vs_input_size};
+    return vs_input_size;
 }
 
 void RasterizerAccelerated::SyncDrawUniforms() {
