@@ -5,6 +5,7 @@
 #include "tico/switch_libnx.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cctype>
 #include <csignal>
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <exception>
 #include <fcntl.h>
 #include <iterator>
@@ -31,6 +33,7 @@
 #include "overlay/translation_manager.h"
 #include "tico/emu_window_switch.h"
 #include "tico/game_overlay.h"
+#include "tico/saves.h"
 #include "tico/switch_keyboard.h"
 #include "tico/tico_settings.h"
 #include "common/file_util.h"
@@ -873,77 +876,144 @@ bool DrainAsyncOperationsForSavestate(Core::System& system) {
     return true;
 }
 
-bool SaveStateFromOverlay(Core::System& system, u32 slot) {
-    if (!DrainAsyncOperationsForSavestate(system)) {
+// the running game's title id, which names its states
+u64 game_title_id = 0;
+
+std::string TrFormat(const char* key, int value) {
+    const std::string format = SwitchFrontend::OverlayTranslation::tr(key);
+    char text[256];
+    std::snprintf(text, sizeof(text), format.c_str(), value);
+    return text;
+}
+
+void ShowStateToast(const std::string& message) {
+    SwitchFrontend::OverlayUI::ShowToast(message, SwitchFrontend::OverlayUI::ToastCorner::TopRight);
+}
+
+bool SaveStateFromOverlay(Core::System& system, int slot) {
+    if (game_title_id == 0 || !DrainAsyncOperationsForSavestate(system)) {
         return false;
     }
 
-    DebugLog("overlay begin direct save state slot %u", slot);
-    DebugLogSwitchMemory("before-save");
+    DebugLog("overlay save state slot %d", slot);
     try {
-        system.SaveState(slot);
-        DebugLogSwitchMemory("after-save");
-        DebugLog("overlay direct save state completed");
-        SwitchFrontend::OverlayUI::ShowToast("State saved",
-                                             SwitchFrontend::OverlayUI::ToastCorner::TopRight);
+        SwitchFrontend::Saves::SaveSlot(system, game_title_id, slot);
+        if (slot != SwitchFrontend::OverlayUI::kAutoStateSlot) {
+            ShowStateToast(TrFormat("emulator_state_saved", slot));
+        }
         system.frame_limiter.AdvanceFrame();
         return true;
     } catch (const std::exception& e) {
-        DebugLogSwitchMemory("save-failed");
-        DebugLog("overlay direct save state failed: %s", e.what());
-        SwitchFrontend::OverlayUI::ShowToast(std::string{"Save failed: "} + e.what(),
-                                             SwitchFrontend::OverlayUI::ToastCorner::TopRight);
+        DebugLog("overlay save state failed: %s", e.what());
+        ShowStateToast(std::string{"Save failed: "} + e.what());
         return false;
     }
 }
 
-bool LoadStateFromOverlay(Core::System& system, u32 slot) {
+// What a Load State row loads: a slot, or one of the undo rows.
+enum class StateLoad { Slot, UndoLoad, UndoSave };
+
+bool LoadStateFromOverlay(Core::System& system, StateLoad load, int slot) {
+    namespace Saves = SwitchFrontend::Saves;
     if (!DrainAsyncOperationsForSavestate(system)) {
         return false;
     }
 
-    DebugLog("overlay begin direct load state slot %u", slot);
-    DebugLogSwitchMemory("before-load");
+    DebugLog("overlay load state %d slot %d", static_cast<int>(load), slot);
     try {
-        system.LoadState(slot);
-        DebugLogSwitchMemory("after-load");
-        DebugLog("overlay direct load state completed");
-        SwitchFrontend::OverlayUI::ShowToast("State loaded",
-                                             SwitchFrontend::OverlayUI::ToastCorner::TopRight);
+        switch (load) {
+        case StateLoad::Slot:
+            Saves::LoadSlot(system, slot);
+            ShowStateToast(slot == SwitchFrontend::OverlayUI::kAutoStateSlot
+                               ? SwitchFrontend::OverlayTranslation::tr("emulator_auto_loaded")
+                               : TrFormat("emulator_state_loaded", slot));
+            break;
+        case StateLoad::UndoLoad:
+            Saves::UndoLoad(system);
+            ShowStateToast(SwitchFrontend::OverlayTranslation::tr("emulator_undo_load_done"));
+            break;
+        case StateLoad::UndoSave:
+            Saves::UndoSave(system, game_title_id);
+            ShowStateToast(SwitchFrontend::OverlayTranslation::tr("emulator_undo_save_done"));
+            break;
+        }
         system.frame_limiter.AdvanceFrame();
         return true;
     } catch (const std::exception& e) {
-        DebugLogSwitchMemory("load-failed");
-        DebugLog("overlay direct load state failed: %s", e.what());
-        SwitchFrontend::OverlayUI::ShowToast(std::string{"Load failed: "} + e.what(),
-                                             SwitchFrontend::OverlayUI::ToastCorner::TopRight);
+        DebugLog("overlay load state failed: %s", e.what());
+        ShowStateToast(std::string{"Load failed: "} + e.what());
         return false;
     }
+}
+
+// The session's state in the auto slot (Exit, Restart), what "Continue where
+// you left off" loads at the next launch.
+void WriteAutoSave(Core::System& system) {
+    static bool written = false;
+    if (written || !system.IsPoweredOn()) {
+        return;
+    }
+    written = SaveStateFromOverlay(system, SwitchFrontend::OverlayUI::kAutoStateSlot);
+    DebugLog("auto save %s", written ? "written" : "failed");
+}
+
+// Left by Restart: the relaunched game starts over instead of offering the auto save.
+std::string RestartMarkerPath() {
+    return SwitchFrontend::Saves::StatePath(game_title_id, SwitchFrontend::OverlayUI::kAutoStateSlot) +
+           ".restart";
+}
+
+bool FileExists(const std::string& path) {
+    struct stat st {};
+    return stat(path.c_str(), &st) == 0;
 }
 
 void ConfigureOverlay(Core::System& system, const std::string& display_title) {
-    SwitchFrontend::OverlayUI::SetGameTitle(display_title.empty() ? std::string{"Azahar"}
-                                                                  : display_title);
+    namespace OverlayUI = SwitchFrontend::OverlayUI;
+    namespace Saves = SwitchFrontend::Saves;
+    OverlayUI::SetGameTitle(display_title.empty() ? std::string{"Azahar"} : display_title);
 
-    u64 title_id = 0;
-    if (system.GetAppLoader().ReadProgramId(title_id) != Loader::ResultStatus::Success) {
-        title_id = 0;
+    if (system.GetAppLoader().ReadProgramId(game_title_id) != Loader::ResultStatus::Success) {
+        game_title_id = 0;
     }
 
-    SwitchFrontend::OverlayUI::SetSlotOccupiedCallback([&system, title_id](int slot) {
-        if (title_id == 0 || slot < 0) {
-            return false;
+    OverlayUI::SetSlotOccupiedCallback([](int slot) {
+        return game_title_id != 0 && slot > 0 && FileExists(Saves::StatePath(game_title_id, slot));
+    });
+    // Called while the menu is drawn: each slot's picture, taken when it was saved.
+    OverlayUI::SetSlotPreviewCallback([](int slot) {
+        static std::array<unsigned long long, OverlayUI::kAutoStateSlot + 1> pictures{};
+        OverlayUI::SlotPreview preview;
+        if (game_title_id == 0 || slot < 1 || slot >= static_cast<int>(pictures.size())) {
+            return preview;
         }
-        const auto savestates = Core::ListSaveStates(title_id, system.Movie().GetCurrentMovieID());
-        return std::any_of(savestates.begin(), savestates.end(), [slot](const auto& info) {
-            return info.slot == static_cast<u32>(slot) &&
-                   info.status == Core::SaveStateInfo::ValidationStatus::OK;
-        });
+        // the slot may have been saved again since
+        SwitchFrontend::GameOverlay::FreePicture(pictures[slot]);
+        pictures[slot] = 0;
+
+        struct stat st {};
+        if (stat(Saves::StatePath(game_title_id, slot).c_str(), &st) != 0) {
+            return preview;
+        }
+        char when[32];
+        if (std::strftime(when, sizeof(when), "%Y-%m-%d %H:%M", std::localtime(&st.st_mtime))) {
+            preview.saved_at = when;
+        }
+        pictures[slot] = SwitchFrontend::GameOverlay::LoadPicture(
+            Saves::PicturePath(game_title_id, slot), &preview.aspect);
+        preview.texture = pictures[slot];
+        return preview;
+    });
+    OverlayUI::SetUndoStateCallback([] {
+        OverlayUI::UndoStateInfo info;
+        info.can_undo_load = Saves::CanUndoLoad();
+        info.overwritten_saved_at = Saves::OverwrittenSavedAt();
+        return info;
     });
 
-    SwitchFrontend::OverlayUI::SetCheatCallbacks(
+    OverlayUI::SetCheatCallbacks(
         [&system]() {
-            std::vector<SwitchFrontend::OverlayUI::CheatMenuEntry> entries;
+            std::vector<OverlayUI::CheatMenuEntry> entries;
             const auto cheats = system.CheatEngine().GetCheats();
             entries.reserve(cheats.size());
             for (std::size_t i = 0; i < cheats.size(); ++i) {
@@ -963,8 +1033,8 @@ void ConfigureOverlay(Core::System& system, const std::string& display_title) {
             }
             return entries;
         },
-        [&system, title_id](int source_index) {
-            if (title_id == 0 || source_index < 0) {
+        [&system](int source_index) {
+            if (game_title_id == 0 || source_index < 0) {
                 return false;
             }
 
@@ -975,9 +1045,34 @@ void ConfigureOverlay(Core::System& system, const std::string& display_title) {
             }
 
             cheats[index]->SetEnabled(!cheats[index]->IsEnabled());
-            system.CheatEngine().SaveCheatFile(title_id);
+            system.CheatEngine().SaveCheatFile(game_title_id);
             return true;
         });
+}
+
+// Continue where you left off (tico's General > Continue Last Game): the auto
+// save, loaded or offered, unless the game was restarted. Returns true when it
+// was loaded, which makes the renderer again.
+bool OfferAutoSave(Core::System& system) {
+    namespace OverlayUI = SwitchFrontend::OverlayUI;
+    const bool restarted = std::remove(RestartMarkerPath().c_str()) == 0;
+    if (restarted || game_title_id == 0 ||
+        !FileExists(SwitchFrontend::Saves::StatePath(game_title_id, OverlayUI::kAutoStateSlot))) {
+        return false;
+    }
+    const std::string mode = SwitchFrontend::TicoConfig::ResumeOnLaunch();
+    if (mode == "never") {
+        return false;
+    }
+    if (mode == "always") {
+        DebugLog("continue last game: loading the auto save");
+        SwitchFrontend::GameOverlay::Shutdown();
+        LoadStateFromOverlay(system, StateLoad::Slot, OverlayUI::kAutoStateSlot);
+        return true;
+    }
+    DebugLog("continue last game: asking");
+    SwitchFrontend::GameOverlay::ShowResumePrompt();
+    return false;
 }
 
 // A text setting (e.g. the console's name): the system keyboard, filled in with its value.
@@ -1015,28 +1110,33 @@ bool HandleOverlayAction(Core::System& system, SwitchFrontend::OverlayUI::Action
     using OverlayUI::Action;
 
     if (OverlayUI::IsSaveStateAction(action)) {
-        const int slot = OverlayUI::GetStateSlotForAction(action);
-        DebugLog("overlay requested save state slot %d", slot);
         GameOverlay::SetVisible(false);
-        SaveStateFromOverlay(system, static_cast<u32>(slot));
+        SaveStateFromOverlay(system, OverlayUI::GetStateSlotForAction(action));
         return false;
     }
-    if (OverlayUI::IsLoadStateAction(action)) {
-        const int slot = OverlayUI::GetStateSlotForAction(action);
-        DebugLog("overlay requested load state slot %d", slot);
+    if (OverlayUI::IsLoadStateAction(action) || action == Action::UndoLoadState ||
+        action == Action::UndoSaveState) {
+        const StateLoad load = action == Action::UndoLoadState   ? StateLoad::UndoLoad
+                               : action == Action::UndoSaveState ? StateLoad::UndoSave
+                                                                 : StateLoad::Slot;
         GameOverlay::Shutdown();
-        LoadStateFromOverlay(system, static_cast<u32>(slot));
+        LoadStateFromOverlay(system, load, OverlayUI::GetStateSlotForAction(action));
         return true;
     }
 
     switch (action) {
     case Action::Exit:
         DebugLog("overlay requested exit");
+        WriteAutoSave(system);
         GameOverlay::SetVisible(false);
         system.RequestShutdown();
         break;
     case Action::Restart:
         DebugLog("overlay requested restart");
+        WriteAutoSave(system);
+        if (std::FILE* marker = std::fopen(RestartMarkerPath().c_str(), "wb")) {
+            std::fclose(marker);
+        }
         GameOverlay::SetVisible(false);
         relaunch = true;
         system.RequestShutdown();
@@ -1120,6 +1220,8 @@ int Run(int argc, char** argv) {
              Settings::values.resolution_factor.GetValue());
     StartupLog("Run: FileUtil::SetUserPath %s/", SystemDir);
     FileUtil::SetUserPath(std::string{SystemDir} + "/");
+    // the SD card's saves and the states in tico's folders
+    SwitchFrontend::Saves::UseTicoFolders();
     StartupLog("Run: Common::Log init");
     bool common_log_started = false;
     if (EnableCommonLogFile) {
@@ -1179,6 +1281,9 @@ int Run(int argc, char** argv) {
     bool saw_guest_frame = initial_renderer_frame > 0;
     bool overlay_init_attempted = false;
     bool overlay_initialized = false;
+    bool overlay_was_visible = false;
+    bool auto_save_offered = false;
+    auto picture_deadline = Clock::now();
     s32 last_logged_frame = initial_renderer_frame;
     auto last_heartbeat = Clock::now();
     u64 last_heartbeat_loop_count = loop_count;
@@ -1224,6 +1329,13 @@ int Run(int argc, char** argv) {
             overlay_init_attempted = true;
             overlay_initialized = SwitchFrontend::GameOverlay::Init(*vulkan_renderer);
             DebugLog("tico overlay init %s", overlay_initialized ? "succeeded" : "failed");
+            if (overlay_initialized && !auto_save_offered) {
+                auto_save_offered = true;
+                if (OfferAutoSave(system)) {
+                    overlay_initialized = false;
+                    overlay_init_attempted = false;
+                }
+            }
         }
 
         if (overlay_initialized) {
@@ -1241,6 +1353,15 @@ int Run(int argc, char** argv) {
         }
         const bool overlay_visible =
             overlay_initialized && SwitchFrontend::GameOverlay::IsVisible();
+        // The game pauses once the picture of it (saved with the states made from
+        // the menu) is taken, a frame or two after the menu opens.
+        if (overlay_visible && !overlay_was_visible) {
+            SwitchFrontend::Saves::RequestPicture(system);
+            picture_deadline = Clock::now() + std::chrono::milliseconds(200);
+        }
+        overlay_was_visible = overlay_visible;
+        const bool taking_picture = overlay_visible && !SwitchFrontend::Saves::PictureDone() &&
+                                    Clock::now() < picture_deadline;
         if (!overlay_visible && LayoutComboPressed()) {
             CycleScreenLayout();
         }
@@ -1252,7 +1373,7 @@ int Run(int argc, char** argv) {
         }
 
         Core::System::ResultStatus run_result = Core::System::ResultStatus::Success;
-        if (overlay_visible && vulkan_renderer) {
+        if (overlay_visible && !taking_picture && vulkan_renderer) {
             vulkan_renderer->RedrawCurrentFrame();
         } else {
             run_result = system.RunLoop();

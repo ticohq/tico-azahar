@@ -6,6 +6,8 @@ add_executable(tico
     game_overlay.cpp
     game_overlay.h
     main.cpp
+    saves.cpp
+    saves.h
     switch_keyboard.cpp
     switch_keyboard.h
     switch_compat.cpp
