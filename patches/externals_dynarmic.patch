@@ -1,8 +1,82 @@
+diff --git a/src/dynarmic/backend/arm64/a32_address_space.cpp b/src/dynarmic/backend/arm64/a32_address_space.cpp
+index bbdf925f..720effe5 100644
+--- a/src/dynarmic/backend/arm64/a32_address_space.cpp
++++ b/src/dynarmic/backend/arm64/a32_address_space.cpp
+@@ -158,6 +158,7 @@ static void* EmitExclusiveWriteCallTrampoline(oaknut::CodeGenerator& code, const
+ A32AddressSpace::A32AddressSpace(const A32::UserConfig& conf)
+         : AddressSpace(conf.code_cache_size)
+         , conf(conf) {
++    code_cache_full_callback = conf.code_cache_full_callback;
+     EmitPrelude();
+ }
+ 
+@@ -185,6 +186,11 @@ void A32AddressSpace::InvalidateCacheRanges(const boost::icl::interval_set<u32>&
+     InvalidateBasicBlocks(block_ranges.InvalidateRanges(ranges));
+ }
+ 
++void A32AddressSpace::ClearCache() {
++    AddressSpace::ClearCache();
++    block_ranges.ClearCache();
++}
++
+ void A32AddressSpace::EmitPrelude() {
+     using namespace oaknut::util;
+ 
+diff --git a/src/dynarmic/backend/arm64/a32_address_space.h b/src/dynarmic/backend/arm64/a32_address_space.h
+index 3b9e9fb2..b956b403 100644
+--- a/src/dynarmic/backend/arm64/a32_address_space.h
++++ b/src/dynarmic/backend/arm64/a32_address_space.h
+@@ -21,6 +21,8 @@ public:
+ 
+     void InvalidateCacheRanges(const boost::icl::interval_set<u32>& ranges);
+ 
++    void ClearCache() override;
++
+ protected:
+     friend class A32Core;
+ 
+diff --git a/src/dynarmic/backend/arm64/a64_address_space.cpp b/src/dynarmic/backend/arm64/a64_address_space.cpp
+index d4fe9a9c..ae6b9f23 100644
+--- a/src/dynarmic/backend/arm64/a64_address_space.cpp
++++ b/src/dynarmic/backend/arm64/a64_address_space.cpp
+@@ -354,6 +354,11 @@ void A64AddressSpace::InvalidateCacheRanges(const boost::icl::interval_set<u64>&
+     InvalidateBasicBlocks(block_ranges.InvalidateRanges(ranges));
+ }
+ 
++void A64AddressSpace::ClearCache() {
++    AddressSpace::ClearCache();
++    block_ranges.ClearCache();
++}
++
+ void A64AddressSpace::EmitPrelude() {
+     using namespace oaknut::util;
+ 
+diff --git a/src/dynarmic/backend/arm64/a64_address_space.h b/src/dynarmic/backend/arm64/a64_address_space.h
+index 86eae4dd..bb660f4e 100644
+--- a/src/dynarmic/backend/arm64/a64_address_space.h
++++ b/src/dynarmic/backend/arm64/a64_address_space.h
+@@ -21,6 +21,8 @@ public:
+ 
+     void InvalidateCacheRanges(const boost::icl::interval_set<u64>& ranges);
+ 
++    void ClearCache() override;
++
+ protected:
+     friend class A64Core;
+ 
 diff --git a/src/dynarmic/backend/arm64/address_space.cpp b/src/dynarmic/backend/arm64/address_space.cpp
-index 2c7ae777..84df25cc 100644
+index 2c7ae777..ec3638ce 100644
 --- a/src/dynarmic/backend/arm64/address_space.cpp
 +++ b/src/dynarmic/backend/arm64/address_space.cpp
-@@ -23,7 +23,7 @@ namespace Dynarmic::Backend::Arm64 {
+@@ -4,6 +4,7 @@
+  */
+ 
+ #include <cstdio>
++#include <new>
+ 
+ #include <mcl/bit_cast.hpp>
+ 
+@@ -23,7 +24,7 @@ namespace Dynarmic::Backend::Arm64 {
  AddressSpace::AddressSpace(size_t code_cache_size)
          : code_cache_size(code_cache_size)
          , mem(code_cache_size)
@@ -11,7 +85,28 @@ index 2c7ae777..84df25cc 100644
          , fastmem_manager(exception_handler) {
      ASSERT_MSG(code_cache_size <= 128 * 1024 * 1024, "code_cache_size > 128 MiB not currently supported");
  
-@@ -98,7 +98,7 @@ void AddressSpace::ClearCache() {
+@@ -65,6 +66,20 @@ CodePtr AddressSpace::GetOrEmit(IR::LocationDescriptor descriptor) {
+         return block_entry;
+     }
+ 
++    try {
++        IR::Block ir_block = GenerateIR(descriptor);
++        const EmittedBlockInfo block_info = Emit(std::move(ir_block));
++        return block_info.entry_point;
++    } catch (const std::bad_alloc&) {
++        // Per-block bookkeeping outgrows the code cache it describes, so on a tight heap it is
++        // the maps rather than the cache that run out first. Dropping the cache reclaims them.
++        // This is notably important on Switch.
++        if (code_cache_full_callback) {
++            code_cache_full_callback();
++        }
++        ClearCache();
++    }
++
+     IR::Block ir_block = GenerateIR(descriptor);
+     const EmittedBlockInfo block_info = Emit(std::move(ir_block));
+     return block_info.entry_point;
+@@ -98,7 +113,7 @@ void AddressSpace::ClearCache() {
  }
  
  void AddressSpace::DumpDisassembly() const {
@@ -20,7 +115,7 @@ index 2c7ae777..84df25cc 100644
          std::printf("%s", Common::DisassembleAArch64(*ptr, mcl::bit_cast<u64>(ptr)).c_str());
      }
  }
-@@ -136,7 +136,7 @@ void AddressSpace::Link(EmittedBlockInfo& block_info) {
+@@ -136,7 +151,7 @@ void AddressSpace::Link(EmittedBlockInfo& block_info) {
      using namespace oaknut::util;
  
      for (auto [ptr_offset, target] : block_info.relocations) {
@@ -29,7 +124,7 @@ index 2c7ae777..84df25cc 100644
          c.set_xptr(reinterpret_cast<u32*>(block_info.entry_point + ptr_offset));
  
          switch (target) {
-@@ -276,7 +276,7 @@ void AddressSpace::LinkBlockLinks(const CodePtr entry_point, const CodePtr targe
+@@ -276,7 +291,7 @@ void AddressSpace::LinkBlockLinks(const CodePtr entry_point, const CodePtr targe
      using namespace oaknut::util;
  
      for (auto [ptr_offset, type] : block_relocations_list) {
@@ -39,10 +134,27 @@ index 2c7ae777..84df25cc 100644
  
          switch (type) {
 diff --git a/src/dynarmic/backend/arm64/address_space.h b/src/dynarmic/backend/arm64/address_space.h
-index 835566bd..644cacbe 100644
+index 835566bd..bedc88f6 100644
 --- a/src/dynarmic/backend/arm64/address_space.h
 +++ b/src/dynarmic/backend/arm64/address_space.h
-@@ -50,13 +50,13 @@ protected:
+@@ -5,6 +5,7 @@
+ 
+ #pragma once
+ 
++#include <functional>
+ #include <map>
+ #include <optional>
+ 
+@@ -41,7 +42,7 @@ public:
+ 
+     void InvalidateBasicBlocks(const tsl::robin_set<IR::LocationDescriptor>& descriptors);
+ 
+-    void ClearCache();
++    virtual void ClearCache();
+ 
+     void DumpDisassembly() const;
+ 
+@@ -50,13 +51,13 @@ protected:
      virtual void RegisterNewBasicBlock(const IR::Block& block, const EmittedBlockInfo& block_info) = 0;
  
      void ProtectCodeMemory() {
@@ -58,6 +170,31 @@ index 835566bd..644cacbe 100644
          mem.unprotect();
  #endif
      }
+@@ -70,6 +71,7 @@ protected:
+     FakeCall FastmemCallback(u64 host_pc);
+ 
+     const size_t code_cache_size;
++    std::function<void()> code_cache_full_callback;
+     oaknut::CodeBlock mem;
+     oaknut::CodeGenerator code;
+ 
+diff --git a/src/dynarmic/backend/block_range_information.cpp b/src/dynarmic/backend/block_range_information.cpp
+index 47e512f5..7ffd0af6 100644
+--- a/src/dynarmic/backend/block_range_information.cpp
++++ b/src/dynarmic/backend/block_range_information.cpp
+@@ -33,7 +33,11 @@ tsl::robin_set<IR::LocationDescriptor> BlockRangeInformation<ProgramCounterType>
+             }
+         }
+     }
+-    // TODO: EFFICIENCY: Remove ranges that are to be erased.
++    // Drop every invaldiated block so that the range doesn't grow infinitely causing massive penalties
++    // later for further invalidations.
++    for (auto invalidate_interval : ranges) {
++        block_ranges.erase(invalidate_interval);
++    }
+     return erase_locations;
+ }
+ 
 diff --git a/src/dynarmic/backend/exception_handler_macos.cpp b/src/dynarmic/backend/exception_handler_macos.cpp
 index bac8d9c9..79848208 100644
 --- a/src/dynarmic/backend/exception_handler_macos.cpp
@@ -137,3 +274,25 @@ index ccf807e2..223e8661 100644
 +#endif  // __SWITCH__
 +
  }  // namespace Dynarmic
+diff --git a/src/dynarmic/interface/A32/config.h b/src/dynarmic/interface/A32/config.h
+index 360df06e..1ab91609 100644
+--- a/src/dynarmic/interface/A32/config.h
++++ b/src/dynarmic/interface/A32/config.h
+@@ -8,6 +8,7 @@
+ #include <array>
+ #include <cstddef>
+ #include <cstdint>
++#include <functional>
+ #include <memory>
+ #include <optional>
+ 
+@@ -238,6 +239,9 @@ struct UserConfig {
+     // Maximum size is limited by the maximum length of a x86_64 / arm64 jump.
+     size_t code_cache_size = 128 * 1024 * 1024;  // bytes
+ 
++    /// Invoked when a block fails to allocate and the whole code cache is dropped to recover.
++    std::function<void()> code_cache_full_callback = nullptr;
++
+     /// Internal use only
+     bool very_verbose_debugging_output = false;
+ };
