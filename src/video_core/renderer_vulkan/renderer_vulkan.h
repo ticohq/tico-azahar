@@ -92,6 +92,10 @@ public:
     const Instance& GetVulkanInstance() const {
         return instance;
     }
+    Scheduler& GetScheduler() {
+        return scheduler;
+    }
+
     PresentWindow& GetMainPresentWindow() {
         return main_present_window;
     }

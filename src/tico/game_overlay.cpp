@@ -33,6 +33,7 @@
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_present_window.h"
+#include "video_core/renderer_vulkan/vk_scheduler.h"
 
 namespace SwitchFrontend::GameOverlay {
 namespace {
@@ -81,6 +82,9 @@ u32 s_queue_family = 0;
 u32 s_image_count = 2;
 vk::DescriptorPool s_descriptor_pool;
 vk::CommandPool s_command_pool;
+// Azahar's lock on the graphics queue: Vulkan wants every submit and wait on it serialized, and
+// the scheduler's worker submits from another thread (the GPU thread's frames among them).
+std::mutex* s_queue_mutex = nullptr;
 
 // --- present thread only ---
 bool s_ready = false;
@@ -259,8 +263,14 @@ ImTextureID CreateTexture(const unsigned char* rgba, int width, int height) {
             vk::AccessFlagBits::eShaderRead, vk::PipelineStageFlagBits::eTransfer,
             vk::PipelineStageFlagBits::eFragmentShader);
     cmd.end();
-    s_queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &cmd});
-    s_queue.waitIdle();
+    // only this upload is waited for, under Azahar's queue lock for the submit alone
+    const vk::Fence uploaded = s_device.createFence({});
+    {
+        std::scoped_lock lock{*s_queue_mutex};
+        s_queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &cmd}, uploaded);
+    }
+    static_cast<void>(s_device.waitForFences(uploaded, VK_TRUE, UINT64_MAX));
+    s_device.destroyFence(uploaded);
     s_device.freeCommandBuffers(s_command_pool, cmd);
     s_device.destroyBuffer(staging);
     s_device.freeMemory(staging_memory);
@@ -489,7 +499,11 @@ void DrawCallback(vk::CommandBuffer cmd, vk::Image image, vk::Extent2D extent, v
             .renderArea{.offset = {0, 0}, .extent = extent},
         },
         vk::SubpassContents::eInline);
-    ImGui_ImplVulkan_RenderDrawData(draw_data, static_cast<VkCommandBuffer>(cmd));
+    {
+        // ImGui's backend uploads textures (the font) with a submit and a queue wait of its own
+        std::scoped_lock lock{*s_queue_mutex};
+        ImGui_ImplVulkan_RenderDrawData(draw_data, static_cast<VkCommandBuffer>(cmd));
+    }
     cmd.endRenderPass();
 }
 
@@ -511,6 +525,7 @@ bool Init(Vulkan::RendererVulkan& renderer) {
     s_queue = instance.GetGraphicsQueue();
     s_queue_family = instance.GetGraphicsQueueFamilyIndex();
     s_image_count = std::max(renderer.GetMainPresentWindow().ImageCount(), 2u);
+    s_queue_mutex = &renderer.GetScheduler().submit_mutex;
     if (!s_instance || !s_device) {
         return false;
     }
@@ -551,7 +566,10 @@ void Shutdown() {
     Vulkan::SetOverlayDrawCallback(nullptr);
     Vulkan::SetOverlayResetCallback(nullptr);
     s_registered.store(false);
-    s_device.waitIdle();
+    {
+        std::scoped_lock lock{*s_queue_mutex};
+        s_device.waitIdle();
+    }
 
     if (s_ready) {
         ImGuiOverlay::Shutdown();
