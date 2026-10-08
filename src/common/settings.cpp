@@ -98,6 +98,9 @@ void LogSettings() {
     log_setting("Renderer_AsyncPresentation", values.async_presentation.GetValue());
     log_setting("Renderer_SpirvShaderGen", values.spirv_shader_gen.GetValue());
     log_setting("Renderer_DisableSpirvOptimizer", values.disable_spirv_optimizer.GetValue());
+    log_setting("Renderer_SkipSlowDraw", values.skip_slow_draw.GetValue());
+    log_setting("Renderer_SkipTextureCopy", values.skip_texture_copy.GetValue());
+    log_setting("Renderer_SkipCPUWrite", values.skip_cpu_write.GetValue());
     log_setting("Renderer_Debug", values.renderer_debug.GetValue());
     log_setting("Renderer_PicaDebugging", values.pica_debugging.GetValue());
     log_setting("Renderer_UseHwShader", values.use_hw_shader.GetValue());

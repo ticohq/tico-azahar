@@ -436,6 +436,29 @@
               "restart": true
             }
           ]
+        },
+        {
+          "title": "settings_azahar_hacks",
+          "options": [
+            {
+              "key": "azahar_skip_slow_draw",
+              "label": "settings_azahar_skip_slow_draw",
+              "type": "bool",
+              "default": "false"
+            },
+            {
+              "key": "azahar_skip_texture_copy",
+              "label": "settings_azahar_skip_texture_copy",
+              "type": "bool",
+              "default": "false"
+            },
+            {
+              "key": "azahar_skip_cpu_write",
+              "label": "settings_azahar_skip_cpu_write",
+              "type": "bool",
+              "default": "false"
+            }
+          ]
         }
       ]
     },

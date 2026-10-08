@@ -550,6 +550,11 @@ struct Values {
     Setting<bool> dump_command_buffers{false, Keys::dump_command_buffers};
     SwitchableSetting<bool> spirv_shader_gen{true, Keys::spirv_shader_gen};
     SwitchableSetting<bool> disable_spirv_optimizer{true, Keys::disable_spirv_optimizer};
+    // Speed over accuracy, off by default: drop draws the GPU cannot take, texture copies
+    // from memory it has not cached, and the flush of small CPU writes to cached surfaces.
+    SwitchableSetting<bool> skip_slow_draw{false, Keys::skip_slow_draw};
+    SwitchableSetting<bool> skip_texture_copy{false, Keys::skip_texture_copy};
+    SwitchableSetting<bool> skip_cpu_write{false, Keys::skip_cpu_write};
     // PICA command processing and rendering on a thread of their own
     SwitchableSetting<bool> async_gpu_emulation{false, Keys::async_gpu_emulation};
     SwitchableSetting<bool> strict_gpu_sync{false, Keys::strict_gpu_sync};

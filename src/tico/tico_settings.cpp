@@ -313,6 +313,9 @@ void ApplyLiveValues(const Values& values) {
     Settings::values.use_vsync.SetValue(GetBool(values, "azahar_vsync"));
     Settings::values.show_shader_compile_notice.SetValue(
         GetBool(values, "azahar_shader_notice"));
+    Settings::values.skip_slow_draw.SetValue(GetBool(values, "azahar_skip_slow_draw"));
+    Settings::values.skip_texture_copy.SetValue(GetBool(values, "azahar_skip_texture_copy"));
+    Settings::values.skip_cpu_write.SetValue(GetBool(values, "azahar_skip_cpu_write"));
     Settings::values.simulate_3ds_gpu_timings.SetValue(
         GetBool(values, "azahar_simulate_gpu_timings"));
     Settings::values.disable_right_eye_render.SetValue(!GetBool(values, "azahar_right_eye"));
