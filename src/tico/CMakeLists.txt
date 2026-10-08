@@ -51,6 +51,15 @@ if(NOT SWITCH_VULKAN_LIB)
     message(FATAL_ERROR "Switch Vulkan frontend requires libvulkan.a. Set SWITCH_VULKAN_LIBRARY or SWITCH_VULKAN_ROOT.")
 endif()
 
+# Older NVK builds need libdrm_nouveau; the portlibs one needs expat instead (see its vulkan.pc)
+find_library(SWITCH_DRM_NOUVEAU_LIB NAMES drm_nouveau PATHS "${DEVKITPRO}/portlibs/switch/lib" NO_DEFAULT_PATH)
+find_library(SWITCH_EXPAT_LIB NAMES expat PATHS "${DEVKITPRO}/portlibs/switch/lib" NO_DEFAULT_PATH)
+foreach(_lib SWITCH_DRM_NOUVEAU_LIB SWITCH_EXPAT_LIB)
+    if(NOT ${_lib})
+        set(${_lib} "")
+    endif()
+endforeach()
+
 target_link_libraries(tico PRIVATE
     citra_common
     citra_core
@@ -67,7 +76,8 @@ target_link_libraries(tico PRIVATE
     GLESv2
     glapi
     ${SWITCH_VULKAN_LIB}
-    drm_nouveau
+    ${SWITCH_DRM_NOUVEAU_LIB}
+    ${SWITCH_EXPAT_LIB}
     z
     nx
     m
