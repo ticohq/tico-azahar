@@ -191,8 +191,17 @@ PresentWindow::PresentWindow(Frontend::EmuWindow& emu_window_, const Instance& i
 }
 
 PresentWindow::~PresentWindow() {
-    scheduler.Finish();
+    // The present thread records into the command pool and every frame destroyed below, so it has
+    // to be gone before any of them are.
+    present_thread.request_stop();
+    if (present_thread.joinable()) {
+        present_thread.join();
+    }
+
+    // Drain rather than submit.
+    scheduler.WaitWorker();
     const vk::Device device = instance.GetDevice();
+    device.waitIdle();
     // If the window is destroyed before the next_surface is
     // consumed, make sure to destroy it here to prevent a
     // resource leak.

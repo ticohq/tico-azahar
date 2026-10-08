@@ -307,6 +307,11 @@ public:
     }
 
     void RasterizerFlushVirtualRegion(VAddr start, u32 size, FlushMode mode) {
+        auto* gpu = system.GPUPtr();
+        if (!gpu) {
+            return;
+        }
+
         const VAddr end = start + size;
 
         auto CheckRegion = [&](VAddr region_start, VAddr region_end, PAddr paddr_region_start) {
@@ -315,7 +320,7 @@ public:
                 return;
             }
 
-            auto& renderer = system.GPU().Renderer();
+            auto& renderer = gpu->Renderer();
             VAddr overlap_start = std::max(start, region_start);
             VAddr overlap_end = std::min(end, region_end);
             PAddr physical_start = paddr_region_start + (overlap_start - region_start);
