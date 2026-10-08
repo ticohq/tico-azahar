@@ -1420,6 +1420,7 @@ int Run(int argc, char** argv) {
     bool overlay_initialized = false;
     bool overlay_was_visible = false;
     bool auto_save_offered = false;
+    u8 operation_mode = appletGetOperationMode();
     auto picture_deadline = Clock::now();
     s32 last_logged_frame = initial_renderer_frame;
     auto last_heartbeat = Clock::now();
@@ -1458,6 +1459,12 @@ int Run(int argc, char** argv) {
         }
 
         SwitchFrontend::Clocks::Keep();
+        // docking or undocking can change the resolution (Docked Resolution)
+        if (const u8 mode = appletGetOperationMode(); mode != operation_mode) {
+            operation_mode = mode;
+            SwitchFrontend::TicoSettings::ApplyLive(system);
+            DebugLog("operation mode %u: settings applied", static_cast<unsigned>(mode));
+        }
         window.PollEvents();
         if (window.TakeSizeChange()) {
             system.GPU().UpdateCurrentFramebufferLayout();

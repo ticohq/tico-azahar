@@ -53,6 +53,9 @@ STRINGS = {
                   "GPU в отдельном потоке", "GPU 独立线程"),
     "fastmem": ("Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem", "Fastmem"),
     "cpu_clock": ("CPU Clock", "CPU-Takt", "Reloj de CPU", "Fréquence CPU", "CPUクロック", "Clock da CPU", "Частота ЦП", "CPU 频率"),
+    "docked_resolution": ("Docked Resolution", "Auflösung im Dock", "Resolución en modo TV",
+                          "Résolution en mode TV", "TVモードの解像度", "Resolução na TV",
+                          "Разрешение в доке", "底座模式分辨率"),
     "resolution": ("Internal Resolution", "Interne Auflösung", "Resolución interna", "Résolution interne", "内部解像度", "Resolução interna", "Внутреннее разрешение", "内部分辨率"),
     "use_hw_shader": ("Hardware Shaders", "Hardware-Shader", "Shaders por hardware", "Shaders matériels", "ハードウェアシェーダー", "Shaders por hardware", "Аппаратные шейдеры", "硬件着色器"),
     "shader_jit": ("Shader JIT", "Shader-JIT", "JIT de shaders", "JIT des shaders", "シェーダーJIT", "JIT de shaders", "JIT шейдеров", "着色器 JIT"),
@@ -173,6 +176,8 @@ STRINGS = {
 # choice label -> de, es, fr, ja, pt, ru, zh (settings_azahar_value_<slug>);
 # labels missing here stay as written (numbers, names)
 VALUES = {
+    "Same as handheld": ("Wie im Handheld-Modus", "Igual que en portátil", "Comme en mode portable",
+                         "携帯モードと同じ", "Igual ao portátil", "Как в портативном", "与掌机模式相同"),
     "Auto": ("Auto", "Auto", "Auto", "自動", "Auto", "Авто", "自动"),
     "Japan": ("Japan", "Japón", "Japon", "日本", "Japão", "Япония", "日本"),
     "USA": ("USA", "EE. UU.", "États-Unis", "アメリカ", "EUA", "США", "美国"),
@@ -306,6 +311,9 @@ TABS = [
     ("graphics", [
         ("renderer", [
             option("resolution", "resolution", "enum", "1", choices=RESOLUTIONS),
+            # the resolution while docked, switching as the console is docked or undocked
+            option("docked_resolution", "docked_resolution", "enum", "same",
+                   choices=choices(("Same as handheld", "same")) + RESOLUTIONS),
             option("use_hw_shader", "use_hw_shader", "bool", "true", restart=True),
             option("shader_jit", "shader_jit", "bool", "true", restart=True),
             option("accurate_mul", "accurate_mul", "bool", "true", restart=True),

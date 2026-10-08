@@ -355,7 +355,12 @@ void ApplyLiveValues(const Values& values) {
     if (const auto clock = GetInt(values, "azahar_cpu_clock")) {
         Settings::values.cpu_clock_percentage.SetValue(std::clamp(*clock, 5, 400));
     }
-    if (const auto factor = GetInt(values, "azahar_resolution")) {
+    // docked, Docked Resolution when it is set, Internal Resolution otherwise
+    const bool docked = appletGetOperationMode() == AppletOperationMode_Console;
+    const auto docked_factor = GetInt(values, "azahar_docked_resolution");
+    const auto factor =
+        docked && docked_factor ? docked_factor : GetInt(values, "azahar_resolution");
+    if (factor) {
         Settings::values.resolution_factor.SetValue(static_cast<u32>(std::clamp(*factor, 1, 10)));
     }
     Settings::values.use_vsync.SetValue(GetBool(values, "azahar_vsync"));
