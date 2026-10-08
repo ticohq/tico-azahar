@@ -152,16 +152,7 @@ static Result WriteHWRegs(u32 base_address, u32 size_in_bytes, std::span<const u
         return ResultRegsMisaligned;
     }
 
-    std::size_t offset = 0;
-    while (size_in_bytes > 0) {
-        u32 value;
-        std::memcpy(&value, &data[offset], sizeof(u32));
-        gpu.WriteReg(REGS_BEGIN + base_address, value);
-
-        size_in_bytes -= 4;
-        offset += 4;
-        base_address += 4;
-    }
+    gpu.WriteRegs(REGS_BEGIN + base_address, data.first(size_in_bytes));
 
     return ResultSuccess;
 }
@@ -198,23 +189,7 @@ static Result WriteHWRegsWithMask(u32 base_address, u32 size_in_bytes, std::span
         return ResultRegsMisaligned;
     }
 
-    std::size_t offset = 0;
-    while (size_in_bytes > 0) {
-        const u32 reg_address = base_address + REGS_BEGIN;
-        u32 reg_value = gpu.ReadReg(reg_address);
-
-        u32 value, mask;
-        std::memcpy(&value, &data[offset], sizeof(u32));
-        std::memcpy(&mask, &masks[offset], sizeof(u32));
-
-        // Update the current value of the register only for set mask bits
-        reg_value = (reg_value & ~mask) | (value & mask);
-        gpu.WriteReg(reg_address, reg_value);
-
-        size_in_bytes -= 4;
-        offset += 4;
-        base_address += 4;
-    }
+    gpu.WriteRegs(REGS_BEGIN + base_address, data.first(size_in_bytes), masks.first(size_in_bytes));
 
     return ResultSuccess;
 }
@@ -424,7 +399,8 @@ void GSP_GPU::UnregisterInterruptRelayQueue(Kernel::HLERequestContext& ctx) {
 // Uncomment the following line to display the average delay calculated for every frame.
 // #define SHOW_AVERAGE_TIME_PER_FRAME
 
-void GSP_GPU::SignalInterruptForThread(InterruptId interrupt_id, u32 thread_id, u64 wait_delay_ns) {
+void GSP_GPU::SignalInterruptForThread(InterruptId interrupt_id, u32 thread_id, u64 wait_delay_ns,
+                                       u64 elapsed_ns) {
 
     // Every gsp request takes a constant amount of time to be
     // processed and control returned to the application. This
@@ -511,6 +487,8 @@ void GSP_GPU::SignalInterruptForThread(InterruptId interrupt_id, u32 thread_id, 
 #ifdef SHOW_AVERAGE_TIME_PER_FRAME
     track_average(false);
 #endif
+
+    wait_delay_ns = wait_delay_ns > elapsed_ns ? wait_delay_ns - elapsed_ns : 0;
 
     if (wait_delay_ns) {
         size_t pending_interrupt_id =
@@ -605,7 +583,7 @@ void Service::GSP::GSP_GPU::ProcessPendingInterruptImpl(InterruptId interrupt_id
     }
 }
 
-void GSP_GPU::SignalInterrupt(InterruptId interrupt_id, u64 wait_delay_ns) {
+void GSP_GPU::SignalInterrupt(InterruptId interrupt_id, u64 wait_delay_ns, u64 elapsed_ns) {
     if (nullptr == shared_memory) {
         LOG_WARNING(Service_GSP, "cannot synchronize until GSP shared memory has been created!");
         return;
@@ -616,7 +594,7 @@ void GSP_GPU::SignalInterrupt(InterruptId interrupt_id, u64 wait_delay_ns) {
     // right), but the PDC0/1 interrupts are signaled for every registered thread.
     if (interrupt_id == InterruptId::PDC0 || interrupt_id == InterruptId::PDC1) {
         for (u32 thread_id = 0; thread_id < MaxGSPThreads; ++thread_id) {
-            SignalInterruptForThread(interrupt_id, thread_id, wait_delay_ns);
+            SignalInterruptForThread(interrupt_id, thread_id, wait_delay_ns, elapsed_ns);
         }
         return;
     }
@@ -626,7 +604,7 @@ void GSP_GPU::SignalInterrupt(InterruptId interrupt_id, u64 wait_delay_ns) {
         return;
     }
 
-    SignalInterruptForThread(interrupt_id, thread_id_with_rights, wait_delay_ns);
+    SignalInterruptForThread(interrupt_id, thread_id_with_rights, wait_delay_ns, elapsed_ns);
 }
 
 void GSP_GPU::SetLcdForceBlack(Kernel::HLERequestContext& ctx) {
@@ -934,7 +912,7 @@ Result GSP_GPU::AcquireGpuRight(const Kernel::HLERequestContext& ctx,
 
     auto& gpu = system.GPU();
     gpu.ApplyPerProgramSettings(process->codeset->program_id);
-    gpu.GetRightEyeDisabler().SetEnabled(right_eye_disable_allow);
+    gpu.SetRightEyeEnabled(right_eye_disable_allow);
     gpu.PicaCore().vs_setup.SetRequiresShaderFixup(requires_shader_fixup);
     gpu.PicaCore().gs_setup.SetRequiresShaderFixup(requires_shader_fixup);
 

@@ -121,8 +121,8 @@ public:
             artic_events.Set(event, set);
         }
     }
-    /// Boolean representing whether game_frames has been updated since last time it was presented
-    static bool game_frames_updated;
+    /// Whether either screen has been swapped since the last present.
+    static std::atomic<bool> game_frames_updated;
 
 private:
     mutable std::mutex object_mutex;
@@ -172,15 +172,15 @@ private:
     Clock::duration accumulated_gpu_time = Clock::duration::zero();
 
     Clock::time_point start_swap_time = reset_point;
-    Clock::duration accumulated_swap_time = Clock::duration::zero();
+    std::atomic<s64> accumulated_swap_time_ns{};
 
     /// Last recorded performance statistics.
-    Results last_stats;
+    Results last_stats{};
 };
 
 class FrameLimiter {
 public:
-    using Clock = std::chrono::high_resolution_clock;
+    using Clock = std::chrono::steady_clock;
 
     void DoFrameLimiting(std::chrono::microseconds current_system_time_us);
 

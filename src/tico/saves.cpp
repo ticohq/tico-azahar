@@ -155,7 +155,8 @@ void RequestPicture(Core::System& system) {
     if (!system.IsPoweredOn() || s_picture.load() == Picture::Pending) {
         return;
     }
-    auto& renderer = system.GPU().Renderer();
+    // the request is an atomic flag the renderer picks up as it presents, on whichever thread
+    auto& renderer = system.GPU().RendererNoSync();
     if (renderer.IsScreenshotPending()) {
         return;
     }

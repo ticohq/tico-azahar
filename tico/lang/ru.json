@@ -95,6 +95,7 @@
     "emulator_original": "Оригинал",
     "emulator_no_discs": "Диски не найдены",
     "settings_azahar_accurate_mul": "Точное умножение",
+    "settings_azahar_async_gpu": "GPU в отдельном потоке",
     "settings_azahar_async_shaders": "Асинхронные шейдеры",
     "settings_azahar_audio": "Звук",
     "settings_azahar_audio_stretching": "Растяжение звука",

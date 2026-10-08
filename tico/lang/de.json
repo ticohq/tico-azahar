@@ -95,6 +95,7 @@
     "emulator_original": "Original",
     "emulator_no_discs": "Keine Discs gefunden",
     "settings_azahar_accurate_mul": "Genaue Multiplikation",
+    "settings_azahar_async_gpu": "GPU in eigenem Thread",
     "settings_azahar_async_shaders": "Asynchrone Shader",
     "settings_azahar_audio": "Audio",
     "settings_azahar_audio_stretching": "Audio-Stretching",

@@ -780,6 +780,7 @@ void CycleScreenLayout() {
     // The Switch emu window re-reads layout_option every frame in RefreshDimensions(),
     // so simply updating the value applies the new layout on the next present.
     Settings::values.layout_option.SetValue(next);
+    Core::System::GetInstance().GPU().UpdateCurrentFramebufferLayout();
     DebugLog("screen layout cycled: %s -> %s", LayoutOptionName(current), LayoutOptionName(next));
 }
 
@@ -787,6 +788,7 @@ void ToggleUprightScreen() {
     const bool current = Settings::values.upright_screen.GetValue();
     const bool next = !current;
     Settings::values.upright_screen.SetValue(next);
+    Core::System::GetInstance().GPU().UpdateCurrentFramebufferLayout();
     DebugLog("upright screen toggled: %d -> %d", current ? 1 : 0, next ? 1 : 0);
     SwitchFrontend::OverlayUI::ShowToast(next ? "Upright screens on" : "Upright screens off",
                                          SwitchFrontend::OverlayUI::ToastCorner::TopRight);
@@ -796,6 +798,7 @@ void ToggleSwapScreens() {
     const bool current = Settings::values.swap_screen.GetValue();
     const bool next = !current;
     Settings::values.swap_screen.SetValue(next);
+    Core::System::GetInstance().GPU().UpdateCurrentFramebufferLayout();
     SwitchFrontend::TicoConfig::SetConfigValue("azahar_swap_screens", next ? "true" : "false");
     SwitchFrontend::TicoConfig::SaveConfig();
     DebugLog("swap screens toggled: %d -> %d", current ? 1 : 0, next ? 1 : 0);
@@ -1378,7 +1381,7 @@ int Run(int argc, char** argv) {
     u64 loop_count = 0;
     u64 keepalive_count = 0;
     bool applet_loop_active = true;
-    const s32 initial_renderer_frame = system.GPU().Renderer().GetCurrentFrame();
+    const s32 initial_renderer_frame = system.GPU().RendererNoSync().GetCurrentFrame();
     bool saw_guest_frame = initial_renderer_frame > 0;
     bool overlay_init_attempted = false;
     bool overlay_initialized = false;
@@ -1403,7 +1406,7 @@ int Run(int argc, char** argv) {
             break;
         }
 
-        auto& renderer = system.GPU().Renderer();
+        auto& renderer = system.GPU().RendererNoSync();
         auto* vulkan_renderer =
             Settings::values.graphics_api.GetValue() == Settings::GraphicsAPI::Vulkan
                 ? static_cast<Vulkan::RendererVulkan*>(&renderer)
@@ -1413,6 +1416,8 @@ int Run(int argc, char** argv) {
             keepalive_count++;
             DebugLog("startup keepalive present #%llu: renderer_frame=%d",
                      static_cast<unsigned long long>(keepalive_count), renderer.GetCurrentFrame());
+            // the renderer is the GPU thread's while it has queued work
+            system.GPU().WaitIdle();
             renderer.TryPresent(0);
             DebugLog("startup keepalive present #%llu complete",
                      static_cast<unsigned long long>(keepalive_count));
@@ -1421,6 +1426,9 @@ int Run(int argc, char** argv) {
 
         SwitchFrontend::Clocks::Keep();
         window.PollEvents();
+        if (window.TakeSizeChange()) {
+            system.GPU().UpdateCurrentFramebufferLayout();
+        }
         InputCommon::SwitchHID::Update();
         padUpdate(&pad);
 
@@ -1473,13 +1481,15 @@ int Run(int argc, char** argv) {
 
         Core::System::ResultStatus run_result = Core::System::ResultStatus::Success;
         if (overlay_visible && !taking_picture && vulkan_renderer) {
+            // the game is paused here, so once the GPU thread is idle nothing else draws
+            system.GPU().WaitIdle();
             vulkan_renderer->RedrawCurrentFrame();
         } else {
             run_result = system.RunLoop();
         }
         loop_count++;
         const s32 renderer_frame =
-            system.IsPoweredOn() ? system.GPU().Renderer().GetCurrentFrame() : last_logged_frame;
+            system.IsPoweredOn() ? system.GPU().RendererNoSync().GetCurrentFrame() : last_logged_frame;
         if (!saw_guest_frame && renderer_frame > 0) {
             saw_guest_frame = true;
             DebugLog("first guest frame reached: renderer_frame=%d keepalives=%llu", renderer_frame,

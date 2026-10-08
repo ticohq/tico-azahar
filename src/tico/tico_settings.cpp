@@ -19,6 +19,7 @@
 #include "common/settings.h"
 #include "common/string_util.h"
 #include "core/core.h"
+#include "video_core/gpu.h"
 #include "core/hle/service/cfg/cfg.h"
 #include "overlay/tico_config.h"
 #include "tico/switch_libnx.h"
@@ -337,6 +338,7 @@ void Apply() {
     const Values values = CurrentValues();
     Settings::values.is_new_3ds.SetValue(GetBool(values, "azahar_new_3ds"));
     Settings::values.fastmem.SetValue(GetBool(values, "azahar_fastmem"));
+    Settings::values.async_gpu_emulation.SetValue(GetBool(values, "azahar_async_gpu"));
     Settings::values.region_value.SetValue(Region(Get(values, "azahar_region")));
     Settings::values.use_virtual_sd.SetValue(GetBool(values, "azahar_use_virtual_sd"));
     Settings::values.use_hw_shader.SetValue(GetBool(values, "azahar_use_hw_shader"));
@@ -351,6 +353,8 @@ void Apply() {
 }
 
 void ApplyLive(Core::System& system) {
+    // the renderer reads these settings: changed only while the GPU thread is idle
+    system.GPU().WaitIdle();
     ApplyLiveValues(CurrentValues());
     system.ApplySettings();
 }

@@ -211,6 +211,13 @@
               "type": "bool",
               "default": "true",
               "restart": true
+            },
+            {
+              "key": "azahar_async_gpu",
+              "label": "settings_azahar_async_gpu",
+              "type": "bool",
+              "default": "true",
+              "restart": true
             }
           ]
         }

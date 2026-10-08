@@ -29,7 +29,7 @@ constexpr std::size_t IgnoreFrames = 5;
 
 namespace Core {
 
-bool PerfStats::game_frames_updated = true;
+std::atomic<bool> PerfStats::game_frames_updated = true;
 
 PerfStats::PerfStats(u64 title_id) : title_id(title_id) {}
 
@@ -79,7 +79,9 @@ void PerfStats::StartSwap() {
 }
 
 void PerfStats::EndSwap() {
-    accumulated_swap_time += (Clock::now() - start_swap_time);
+    const auto elapsed_ns =
+        duration_cast<std::chrono::nanoseconds>(Clock::now() - start_swap_time).count();
+    accumulated_swap_time_ns.fetch_add(elapsed_ns, std::memory_order_relaxed);
 }
 
 void PerfStats::BeginSystemFrame() {
@@ -130,6 +132,8 @@ PerfStats::Results PerfStats::GetAndResetStats(microseconds current_system_time_
     std::scoped_lock lock{object_mutex};
 
     const auto now = Clock::now();
+    const auto accumulated_swap_time =
+        std::chrono::nanoseconds{accumulated_swap_time_ns.exchange(0, std::memory_order_relaxed)};
     // Walltime elapsed since stats were reset
     const auto interval = duration_cast<DoubleSecs>(now - reset_point).count();
 
@@ -177,7 +181,6 @@ PerfStats::Results PerfStats::GetAndResetStats(microseconds current_system_time_
     accumulated_svc_time = Clock::duration::zero();
     accumulated_ipc_time = Clock::duration::zero();
     accumulated_gpu_time = Clock::duration::zero();
-    accumulated_swap_time = Clock::duration::zero();
     game_frames = 0;
     artic_transmitted = 0;
     prev_artic_event.raw &= artic_events.raw;

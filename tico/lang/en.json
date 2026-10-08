@@ -100,6 +100,7 @@
     "emulator_cheat_unnamed": "Unnamed code",
     "emulator_cheats_disabled": "Cheats are off: turn on Enable Cheats in Settings, then Restart",
     "settings_azahar_accurate_mul": "Accurate Multiplication",
+    "settings_azahar_async_gpu": "GPU on its own thread",
     "settings_azahar_async_shaders": "Async Shaders",
     "settings_azahar_audio": "Audio",
     "settings_azahar_audio_stretching": "Audio Stretching",

@@ -98,6 +98,7 @@
     "emulator_original": "Original",
     "emulator_no_discs": "No hay discos",
     "settings_azahar_accurate_mul": "Multiplicación precisa",
+    "settings_azahar_async_gpu": "GPU en su propio hilo",
     "settings_azahar_async_shaders": "Shaders asíncronos",
     "settings_azahar_audio": "Audio",
     "settings_azahar_audio_stretching": "Estiramiento de audio",

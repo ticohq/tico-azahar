@@ -25,6 +25,7 @@
 
 #include "TicoOverlayHost.h"
 #include "common/logging/log.h"
+#include "common/settings.h"
 #include "core/core.h"
 #include "overlay/imgui_overlay.h"
 #include "video_core/gpu.h"
@@ -385,8 +386,9 @@ void PublishHudStats() {
     auto& system = Core::System::GetInstance();
     OverlayUI::HudStats stats;
     stats.fps = static_cast<float>(system.GetLastPerfStats().game_fps);
-    if (system.IsPoweredOn()) {
-        const u32 scale = system.GPU().Renderer().GetResolutionScaleFactor();
+    // from the settings, not the renderer: this runs on the present thread, which the GPU
+    // thread waits on, and asking the GPU for its renderer waits for the GPU thread
+    if (const u32 scale = Settings::values.resolution_factor.GetValue(); scale != 0) {
         stats.rendered_width = static_cast<int>(400 * scale);
         stats.rendered_height = static_cast<int>(240 * scale);
     }

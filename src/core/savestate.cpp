@@ -30,6 +30,7 @@
 #include "core/loader/loader.h"
 #include "core/movie.h"
 #include "core/savestate.h"
+#include "video_core/gpu.h"
 #include "network/network.h"
 
 namespace Core {
@@ -469,6 +470,10 @@ SaveStateInfo GetSaveStateInfo(u64 program_id, u64 movie_id, u32 slot) {
 }
 
 void System::SaveState(u32 slot) const {
+    // a state is the GPU's as much as the CPU's: its thread finishes first
+    if (gpu) {
+        gpu->WaitIdle();
+    }
     if (app_loader) {
         if (!app_loader->SupportsSaveStates()) {
             throw std::runtime_error("The current app loader doesn't support save states");
@@ -576,6 +581,10 @@ void System::SaveState(u32 slot) const {
 }
 
 void System::LoadState(u32 slot) {
+    // a state is the GPU's as much as the CPU's: its thread finishes first
+    if (gpu) {
+        gpu->WaitIdle();
+    }
     if (app_loader) {
         if (!app_loader->SupportsSaveStates()) {
             throw std::runtime_error("The current app loader doesn't support save states");
@@ -653,6 +662,10 @@ void System::LoadState(u32 slot) {
 }
 
 std::vector<u8> System::SaveStateBuffer() const {
+    // a state is the GPU's as much as the CPU's: its thread finishes first
+    if (gpu) {
+        gpu->WaitIdle();
+    }
     std::ostringstream sstream{std::ios_base::binary};
     // Serialize
     oarchive oa{sstream};
@@ -672,6 +685,10 @@ std::vector<u8> System::SaveStateBuffer() const {
 }
 
 bool System::LoadStateBuffer(std::vector<u8> buffer) {
+    // a state is the GPU's as much as the CPU's: its thread finishes first
+    if (gpu) {
+        gpu->WaitIdle();
+    }
     CSTHeader header;
 
     if (buffer.size() < sizeof(header)) {

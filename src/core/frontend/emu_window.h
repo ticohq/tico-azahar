@@ -257,6 +257,12 @@ public:
     void UpdateCurrentFramebufferLayout(unsigned width, unsigned height,
                                         bool is_portrait_mode = {});
 
+    /// The size the next layout update lays out for: the window's own, or (when the window can
+    /// change size while another thread renders) the size it last reported.
+    virtual std::pair<u32, u32> GetTargetFramebufferSize() const {
+        return {framebuffer_layout.width, framebuffer_layout.height};
+    }
+
     std::unique_ptr<TextureMailbox> mailbox = nullptr;
     bool isSecondary() const {
         return is_secondary;

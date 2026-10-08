@@ -46,6 +46,10 @@ EmuWindowSwitch::EmuWindowSwitch(NWindow* window_)
     padInitializeDefault(&cursor_pad);
     hidInitializeTouchScreen();
     RefreshDimensions();
+    // nothing renders yet: lay out now, later the GPU does it
+    const auto [width, height] = GetTargetFramebufferSize();
+    UpdateCurrentFramebufferLayout(width, height, false);
+    size_changed.store(false);
 }
 
 void EmuWindowSwitch::PollEvents() {
@@ -66,7 +70,25 @@ void EmuWindowSwitch::RefreshDimensions() {
             height = DefaultHeight;
         }
     }
-    UpdateCurrentFramebufferLayout(width, height, false);
+    // The layout itself is the renderer's, which may run on the GPU thread: the size is recorded
+    // and the GPU lays the screens out for it (see TakeSizeChange).
+    const u64 packed = (static_cast<u64>(width) << 32) | height;
+    if (target_size.exchange(packed) != packed) {
+        size_changed.store(true);
+    }
+}
+
+std::pair<u32, u32> EmuWindowSwitch::GetTargetFramebufferSize() const {
+    const u64 packed = target_size.load();
+    return {static_cast<u32>(packed >> 32), static_cast<u32>(packed & 0xFFFFFFFF)};
+}
+
+std::unique_ptr<Frontend::GraphicsContext> EmuWindowSwitch::CreateSharedContext() const {
+    return std::make_unique<Frontend::GraphicsContext>();
+}
+
+bool EmuWindowSwitch::TakeSizeChange() {
+    return size_changed.exchange(false);
 }
 
 unsigned EmuWindowSwitch::ScaleTouchX(u32 touch_x) const {
