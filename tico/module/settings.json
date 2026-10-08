@@ -533,6 +533,1201 @@
       ]
     },
     {
+      "name": "settings_azahar_controls",
+      "sections": [
+        {
+          "title": "settings_azahar_button_mapping",
+          "options": [
+            {
+              "key": "azahar_map_a",
+              "label": "settings_azahar_map_a",
+              "type": "enum",
+              "default": "A",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_b",
+              "label": "settings_azahar_map_b",
+              "type": "enum",
+              "default": "B",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_x",
+              "label": "settings_azahar_map_x",
+              "type": "enum",
+              "default": "X",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_y",
+              "label": "settings_azahar_map_y",
+              "type": "enum",
+              "default": "Y",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_l",
+              "label": "settings_azahar_map_l",
+              "type": "enum",
+              "default": "L",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_r",
+              "label": "settings_azahar_map_r",
+              "type": "enum",
+              "default": "R",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_zl",
+              "label": "settings_azahar_map_zl",
+              "type": "enum",
+              "default": "ZL",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_zr",
+              "label": "settings_azahar_map_zr",
+              "type": "enum",
+              "default": "ZR",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_start",
+              "label": "settings_azahar_map_start",
+              "type": "enum",
+              "default": "Plus",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_select",
+              "label": "settings_azahar_map_select",
+              "type": "enum",
+              "default": "Minus",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_up",
+              "label": "settings_azahar_map_up",
+              "type": "enum",
+              "default": "Up",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_down",
+              "label": "settings_azahar_map_down",
+              "type": "enum",
+              "default": "Down",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_left",
+              "label": "settings_azahar_map_left",
+              "type": "enum",
+              "default": "Left",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_right",
+              "label": "settings_azahar_map_right",
+              "type": "enum",
+              "default": "Right",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_home",
+              "label": "settings_azahar_map_home",
+              "type": "enum",
+              "default": "None",
+              "choices": [
+                {
+                  "label": "A",
+                  "value": "A"
+                },
+                {
+                  "label": "B",
+                  "value": "B"
+                },
+                {
+                  "label": "X",
+                  "value": "X"
+                },
+                {
+                  "label": "Y",
+                  "value": "Y"
+                },
+                {
+                  "label": "L",
+                  "value": "L"
+                },
+                {
+                  "label": "R",
+                  "value": "R"
+                },
+                {
+                  "label": "ZL",
+                  "value": "ZL"
+                },
+                {
+                  "label": "ZR",
+                  "value": "ZR"
+                },
+                {
+                  "label": "Plus",
+                  "value": "Plus"
+                },
+                {
+                  "label": "Minus",
+                  "value": "Minus"
+                },
+                {
+                  "label": "Left stick press",
+                  "value": "StickL"
+                },
+                {
+                  "label": "Right stick press",
+                  "value": "StickR"
+                },
+                {
+                  "label": "Up",
+                  "value": "Up"
+                },
+                {
+                  "label": "Down",
+                  "value": "Down"
+                },
+                {
+                  "label": "Left",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "settings_azahar_sticks",
+          "options": [
+            {
+              "key": "azahar_map_circle_pad",
+              "label": "settings_azahar_map_circle_pad",
+              "type": "enum",
+              "default": "Left",
+              "choices": [
+                {
+                  "label": "Left stick",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right stick",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            },
+            {
+              "key": "azahar_map_c_stick",
+              "label": "settings_azahar_map_c_stick",
+              "type": "enum",
+              "default": "Right",
+              "choices": [
+                {
+                  "label": "Left stick",
+                  "value": "Left"
+                },
+                {
+                  "label": "Right stick",
+                  "value": "Right"
+                },
+                {
+                  "label": "Disabled",
+                  "value": "None"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "settings_azahar_audio",
       "sections": [
         {

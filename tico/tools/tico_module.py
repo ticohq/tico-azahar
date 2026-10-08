@@ -65,6 +65,26 @@ STRINGS = {
     "swap_screens": ("Swap Screens", "Bildschirme tauschen", "Intercambiar pantallas", "Inverser les écrans", "画面を入れ替え", "Trocar telas", "Поменять экраны", "交换屏幕"),
     "volume": ("Volume", "Lautstärke", "Volumen", "Volume", "音量", "Volume", "Громкость", "音量"),
     "audio_stretching": ("Audio Stretching", "Audio-Stretching", "Estiramiento de audio", "Étirement audio", "オーディオストレッチ", "Esticamento de áudio", "Растяжение звука", "音频拉伸"),
+    "controls": ("Controls", "Steuerung", "Controles", "Commandes", "操作", "Controles", "Управление", "控制"),
+    "button_mapping": ("Button Mapping", "Tastenbelegung", "Asignación de botones", "Attribution des boutons", "ボタン割り当て", "Mapeamento de botões", "Назначение кнопок", "按键映射"),
+    "sticks": ("Sticks", "Sticks", "Palancas", "Sticks", "スティック", "Analógicos", "Стики", "摇杆"),
+    "map_a": ("A Button", "A-Taste", "Botón A", "Bouton A", "Aボタン", "Botão A", "Кнопка A", "A 键"),
+    "map_b": ("B Button", "B-Taste", "Botón B", "Bouton B", "Bボタン", "Botão B", "Кнопка B", "B 键"),
+    "map_x": ("X Button", "X-Taste", "Botón X", "Bouton X", "Xボタン", "Botão X", "Кнопка X", "X 键"),
+    "map_y": ("Y Button", "Y-Taste", "Botón Y", "Bouton Y", "Yボタン", "Botão Y", "Кнопка Y", "Y 键"),
+    "map_l": ("L Button", "L-Taste", "Botón L", "Bouton L", "Lボタン", "Botão L", "Кнопка L", "L 键"),
+    "map_r": ("R Button", "R-Taste", "Botón R", "Bouton R", "Rボタン", "Botão R", "Кнопка R", "R 键"),
+    "map_zl": ("ZL Button", "ZL-Taste", "Botón ZL", "Bouton ZL", "ZLボタン", "Botão ZL", "Кнопка ZL", "ZL 键"),
+    "map_zr": ("ZR Button", "ZR-Taste", "Botón ZR", "Bouton ZR", "ZRボタン", "Botão ZR", "Кнопка ZR", "ZR 键"),
+    "map_start": ("START", "START", "START", "START", "START", "START", "START", "START"),
+    "map_select": ("SELECT", "SELECT", "SELECT", "SELECT", "SELECT", "SELECT", "SELECT", "SELECT"),
+    "map_up": ("D-Pad Up", "Steuerkreuz oben", "Cruceta arriba", "Croix haut", "十字ボタン上", "Direcional para cima", "Крестовина вверх", "十字键上"),
+    "map_down": ("D-Pad Down", "Steuerkreuz unten", "Cruceta abajo", "Croix bas", "十字ボタン下", "Direcional para baixo", "Крестовина вниз", "十字键下"),
+    "map_left": ("D-Pad Left", "Steuerkreuz links", "Cruceta izquierda", "Croix gauche", "十字ボタン左", "Direcional para a esquerda", "Крестовина влево", "十字键左"),
+    "map_right": ("D-Pad Right", "Steuerkreuz rechts", "Cruceta derecha", "Croix droite", "十字ボタン右", "Direcional para a direita", "Крестовина вправо", "十字键右"),
+    "map_home": ("HOME Button", "HOME-Taste", "Botón HOME", "Bouton HOME", "HOMEボタン", "Botão HOME", "Кнопка HOME", "HOME 键"),
+    "map_circle_pad": ("Circle Pad", "Schiebepad", "Botón deslizante", "Pad circulaire", "スライドパッド", "Circle Pad", "Circle Pad", "滑杆"),
+    "map_c_stick": ("C-Stick", "C-Stick", "Palanca C", "Stick C", "Cスティック", "C-Stick", "C-стик", "C 摇杆"),
     "mic_input": ("Microphone Input", "Mikrofoneingang", "Entrada de micrófono", "Entrée micro", "マイク入力", "Entrada do microfone", "Вход микрофона", "麦克风输入"),
 }
 
@@ -110,6 +130,17 @@ VALUES = {
     "Fill": ("Füllen", "Llenar", "Remplir", "フィット", "Preencher", "Заполнить", "填充"),
     "Stretch": ("Strecken", "Estirar", "Étirer", "引き伸ばし", "Esticar", "Растянуть", "拉伸"),
     "Original": ("Original", "Original", "Original", "オリジナル", "Original", "Исходный", "原始"),
+    "Plus": ("Plus", "Más", "Plus", "プラス", "Mais", "Плюс", "加号"),
+    "Minus": ("Minus", "Menos", "Moins", "マイナス", "Menos", "Минус", "减号"),
+    "Left stick": ("Linker Stick", "Palanca izquierda", "Stick gauche", "左スティック", "Analógico esquerdo", "Левый стик", "左摇杆"),
+    "Right stick": ("Rechter Stick", "Palanca derecha", "Stick droit", "右スティック", "Analógico direito", "Правый стик", "右摇杆"),
+    "Left stick press": ("Linker Stick drücken", "Pulsar palanca izquierda", "Clic stick gauche", "左スティック押し込み", "Pressionar analógico esquerdo", "Нажатие левого стика", "按下左摇杆"),
+    "Right stick press": ("Rechter Stick drücken", "Pulsar palanca derecha", "Clic stick droit", "右スティック押し込み", "Pressionar analógico direito", "Нажатие правого стика", "按下右摇杆"),
+    "Up": ("Oben", "Arriba", "Haut", "上", "Cima", "Вверх", "上"),
+    "Down": ("Unten", "Abajo", "Bas", "下", "Baixo", "Вниз", "下"),
+    "Left": ("Links", "Izquierda", "Gauche", "左", "Esquerda", "Влево", "左"),
+    "Right": ("Rechts", "Derecha", "Droite", "右", "Direita", "Вправо", "右"),
+    "Disabled": ("Aus", "Desactivado", "Désactivé", "なし", "Desativado", "Отключено", "禁用"),
     "Static Noise": ("Rauschen", "Ruido estático", "Bruit statique", "ノイズ", "Ruído estático", "Шум", "静态噪声"),
 }
 
@@ -139,6 +170,19 @@ CPU_CLOCKS = choices(*((f"{p}%", str(p)) for p in (25, 50, 75, 100, 125, 150, 17
 RESOLUTIONS = choices(("Native", "1"), *((f"{n}x", str(n)) for n in range(2, 11)))
 PROPORTIONS = choices(*((f"{v:.2f}", f"{v:.2f}") for v in [1.0 + 0.5 * i for i in range(11)]))
 VOLUMES = choices(*((f"{v}%", str(v)) for v in range(0, 101, 10)))
+
+# the Switch buttons a 3DS button can be on (src/tico/tico_settings.cpp knows them)
+SWITCH_BUTTONS = choices(("A", "A"), ("B", "B"), ("X", "X"), ("Y", "Y"), ("L", "L"), ("R", "R"),
+                         ("ZL", "ZL"), ("ZR", "ZR"), ("Plus", "Plus"), ("Minus", "Minus"),
+                         ("Left stick press", "StickL"), ("Right stick press", "StickR"),
+                         ("Up", "Up"), ("Down", "Down"), ("Left", "Left"), ("Right", "Right"),
+                         ("Disabled", "None"))
+STICKS = choices(("Left stick", "Left"), ("Right stick", "Right"), ("Disabled", "None"))
+
+
+def button(name, default):
+    return option("map_" + name, "map_" + name, "enum", default, choices=SWITCH_BUTTONS)
+
 
 TABS = [
     ("system", [
@@ -194,6 +238,19 @@ TABS = [
             option("display_size", "display_size", "enum", "Fill",
                    choices=same("Fill", "Stretch", "Original")),
             option("swap_screens", "swap_screens", "bool", "false"),
+        ]),
+    ]),
+    ("controls", [
+        ("button_mapping", [
+            button("a", "A"), button("b", "B"), button("x", "X"), button("y", "Y"),
+            button("l", "L"), button("r", "R"), button("zl", "ZL"), button("zr", "ZR"),
+            button("start", "Plus"), button("select", "Minus"),
+            button("up", "Up"), button("down", "Down"), button("left", "Left"),
+            button("right", "Right"), button("home", "None"),
+        ]),
+        ("sticks", [
+            option("map_circle_pad", "map_circle_pad", "enum", "Left", choices=STICKS),
+            option("map_c_stick", "map_c_stick", "enum", "Right", choices=STICKS),
         ]),
     ]),
     ("audio", [

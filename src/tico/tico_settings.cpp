@@ -15,11 +15,13 @@
 
 #include "audio_core/input_details.h"
 #include "common/logging/log.h"
+#include "common/param_package.h"
 #include "common/settings.h"
 #include "common/string_util.h"
 #include "core/core.h"
 #include "core/hle/service/cfg/cfg.h"
 #include "overlay/tico_config.h"
+#include "tico/switch_libnx.h"
 
 namespace SwitchFrontend::TicoSettings {
 namespace {
@@ -217,6 +219,71 @@ void ApplyDisplaySize(std::string_view value) {
     }
 }
 
+// The Switch button a mapping option names, 0 for none.
+u64 SwitchButton(std::string_view name) {
+    static const std::map<std::string, u64, std::less<>> kButtons = {
+        {"A", HidNpadButton_A},          {"B", HidNpadButton_B},
+        {"X", HidNpadButton_X},          {"Y", HidNpadButton_Y},
+        {"L", HidNpadButton_L},          {"R", HidNpadButton_R},
+        {"ZL", HidNpadButton_ZL},        {"ZR", HidNpadButton_ZR},
+        {"Plus", HidNpadButton_Plus},    {"Minus", HidNpadButton_Minus},
+        {"StickL", HidNpadButton_StickL}, {"StickR", HidNpadButton_StickR},
+        {"Up", HidNpadButton_Up},        {"Down", HidNpadButton_Down},
+        {"Left", HidNpadButton_Left},    {"Right", HidNpadButton_Right},
+    };
+    const auto it = kButtons.find(name);
+    return it != kButtons.end() ? it->second : 0;
+}
+
+// Controls > Button Mapping and Sticks: each 3DS button on its Switch button,
+// the Circle Pad and the C-Stick on a stick, through the switch_hid engine.
+void ApplyControls(const Values& values) {
+    static constexpr std::array<std::pair<Settings::NativeButton::Values, const char*>, 15>
+        kButtons = {{
+        {Settings::NativeButton::A, "azahar_map_a"},
+        {Settings::NativeButton::B, "azahar_map_b"},
+        {Settings::NativeButton::X, "azahar_map_x"},
+        {Settings::NativeButton::Y, "azahar_map_y"},
+        {Settings::NativeButton::L, "azahar_map_l"},
+        {Settings::NativeButton::R, "azahar_map_r"},
+        {Settings::NativeButton::ZL, "azahar_map_zl"},
+        {Settings::NativeButton::ZR, "azahar_map_zr"},
+        {Settings::NativeButton::Start, "azahar_map_start"},
+        {Settings::NativeButton::Select, "azahar_map_select"},
+        {Settings::NativeButton::Up, "azahar_map_up"},
+        {Settings::NativeButton::Down, "azahar_map_down"},
+        {Settings::NativeButton::Left, "azahar_map_left"},
+        {Settings::NativeButton::Right, "azahar_map_right"},
+        {Settings::NativeButton::Home, "azahar_map_home"},
+    }};
+    auto& profile = Settings::values.current_input_profile;
+    for (const auto& [native, key] : kButtons) {
+        const u64 mask = SwitchButton(Get(values, key));
+        if (mask == 0) {
+            profile.buttons[native].clear();
+            continue;
+        }
+        Common::ParamPackage params;
+        params.Set("engine", "switch_hid");
+        params.Set("button", static_cast<int>(mask));
+        profile.buttons[native] = params.Serialize();
+    }
+
+    // axis 0 is the Switch's left stick, 1 its right stick
+    const auto stick = [&values](const char* key) -> std::string {
+        const std::string value = Get(values, key);
+        if (value != "Left" && value != "Right") {
+            return {};
+        }
+        Common::ParamPackage params;
+        params.Set("engine", "switch_hid_analog");
+        params.Set("axis", value == "Left" ? 0 : 1);
+        return params.Serialize();
+    };
+    profile.analogs[Settings::NativeAnalog::CirclePad] = stick("azahar_map_circle_pad");
+    profile.analogs[Settings::NativeAnalog::CStick] = stick("azahar_map_c_stick");
+}
+
 // What can change while a game runs.
 void ApplyLiveValues(const Values& values) {
     if (const auto clock = GetInt(values, "azahar_cpu_clock")) {
@@ -245,6 +312,7 @@ void ApplyLiveValues(const Values& values) {
         Settings::values.volume.SetValue(static_cast<float>(std::clamp(*volume, 0, 100)) / 100.0f);
     }
     Settings::values.enable_audio_stretching.SetValue(GetBool(values, "azahar_audio_stretching"));
+    ApplyControls(values);
 }
 
 } // namespace

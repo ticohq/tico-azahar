@@ -698,36 +698,8 @@ void ConfigureSettings() {
     Settings::values.output_type.SetValue(AudioCore::SinkType::Auto);
     Settings::values.input_type.SetValue(AudioCore::InputType::Null);
 
+    // the buttons and sticks come from Controls (TicoSettings)
     auto& profile = Settings::values.current_input_profile;
-    const auto MakeButton = [](u64 mask) {
-        Common::ParamPackage pkg;
-        pkg.Set("engine", "switch_hid");
-        pkg.Set("button", static_cast<int>(mask));
-        return pkg.Serialize();
-    };
-    profile.buttons[Settings::NativeButton::A]      = MakeButton(HidNpadButton_A);
-    profile.buttons[Settings::NativeButton::B]      = MakeButton(HidNpadButton_B);
-    profile.buttons[Settings::NativeButton::X]      = MakeButton(HidNpadButton_X);
-    profile.buttons[Settings::NativeButton::Y]      = MakeButton(HidNpadButton_Y);
-    profile.buttons[Settings::NativeButton::Up]     = MakeButton(HidNpadButton_Up);
-    profile.buttons[Settings::NativeButton::Down]   = MakeButton(HidNpadButton_Down);
-    profile.buttons[Settings::NativeButton::Left]   = MakeButton(HidNpadButton_Left);
-    profile.buttons[Settings::NativeButton::Right]  = MakeButton(HidNpadButton_Right);
-    profile.buttons[Settings::NativeButton::L]      = MakeButton(HidNpadButton_L);
-    profile.buttons[Settings::NativeButton::R]      = MakeButton(HidNpadButton_R);
-    profile.buttons[Settings::NativeButton::Start]  = MakeButton(HidNpadButton_Plus);
-    profile.buttons[Settings::NativeButton::Select] = MakeButton(HidNpadButton_Minus);
-    profile.buttons[Settings::NativeButton::ZL]     = MakeButton(HidNpadButton_ZL);
-    profile.buttons[Settings::NativeButton::ZR]     = MakeButton(HidNpadButton_ZR);
-
-    const auto MakeAnalog = [](int axis) {
-        Common::ParamPackage pkg;
-        pkg.Set("engine", "switch_hid_analog");
-        pkg.Set("axis", axis);
-        return pkg.Serialize();
-    };
-    profile.analogs[Settings::NativeAnalog::CirclePad] = MakeAnalog(0);
-    profile.analogs[Settings::NativeAnalog::CStick]    = MakeAnalog(1);
     profile.motion_device = "engine:switch_hid_motion,sensitivity:1.25";
     profile.touch_device = "engine:emu_window";
     profile.controller_touch_device.clear();
@@ -968,6 +940,42 @@ bool FileExists(const std::string& path) {
     return stat(path.c_str(), &st) == 0;
 }
 
+// Settings > Players: the 3DS has one player, on the handheld or the first controller.
+std::vector<std::string> DescribePlayers() {
+    const auto name = [](u32 style) -> std::string {
+        const char* key = "emulator_pad_other";
+        if (style & HidNpadStyleTag_NpadFullKey) {
+            key = "emulator_pad_pro";
+        } else if (style & HidNpadStyleTag_NpadHandheld) {
+            key = "emulator_pad_handheld";
+        } else if (style & HidNpadStyleTag_NpadJoyDual) {
+            key = "emulator_pad_joycon_pair";
+        } else if (style & HidNpadStyleTag_NpadJoyLeft) {
+            key = "emulator_pad_joycon_left";
+        } else if (style & HidNpadStyleTag_NpadJoyRight) {
+            key = "emulator_pad_joycon_right";
+        } else if (style & HidNpadStyleTag_NpadGc) {
+            key = "emulator_pad_gamecube";
+        }
+        return SwitchFrontend::OverlayTranslation::tr(key);
+    };
+    u32 style = hidGetNpadStyleSet(HidNpadIdType_No1);
+    if (!style) {
+        style = hidGetNpadStyleSet(HidNpadIdType_Handheld);
+    }
+    return {style ? name(style) : std::string{}};
+}
+
+// The system's controller screen, to choose the controller that plays.
+bool ShowControllerOrder() {
+    HidLaControllerSupportArg arg;
+    hidLaCreateControllerSupportArg(&arg);
+    arg.hdr.player_count_min = 0;
+    arg.hdr.player_count_max = 1;
+    HidLaControllerSupportResultInfo info{};
+    return R_SUCCEEDED(hidLaShowControllerSupport(&info, &arg));
+}
+
 void ConfigureOverlay(Core::System& system, const std::string& display_title) {
     namespace OverlayUI = SwitchFrontend::OverlayUI;
     namespace Saves = SwitchFrontend::Saves;
@@ -1004,6 +1012,9 @@ void ConfigureOverlay(Core::System& system, const std::string& display_title) {
         preview.texture = pictures[slot];
         return preview;
     });
+    OverlayUI::PlayerCallbacks players;
+    players.ports = &DescribePlayers;
+    OverlayUI::SetPlayerCallbacks(std::move(players));
     OverlayUI::SetUndoStateCallback([] {
         OverlayUI::UndoStateInfo info;
         info.can_undo_load = Saves::CanUndoLoad();
@@ -1149,6 +1160,12 @@ bool HandleOverlayAction(Core::System& system, SwitchFrontend::OverlayUI::Action
         return true;
     case Action::EditText:
         EditTextOption();
+        break;
+    case Action::ControllerOrder:
+        if (!ShowControllerOrder()) {
+            OverlayUI::ShowToast(SwitchFrontend::OverlayTranslation::tr("emulator_controllers_failed"),
+                                 OverlayUI::ToastCorner::TopRight);
+        }
         break;
     case Action::NoticeChoice:
         OverlayUI::ConsumeNoticeChoice();
