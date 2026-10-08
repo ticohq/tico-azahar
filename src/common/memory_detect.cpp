@@ -18,6 +18,12 @@
 
 #include "common/memory_detect.h"
 
+#ifdef __SWITCH__
+// libnx's svcGetInfo, declared here: its headers clash with common_types' u128
+extern "C" std::uint32_t svcGetInfo(std::uint64_t* out, std::uint32_t id0, std::uint32_t handle,
+                                    std::uint64_t id1);
+#endif
+
 namespace Common {
 
 // Detects the RAM and Swapfile sizes
@@ -50,6 +56,13 @@ const MemoryInfo GetMemInfo() {
     sysctlbyname("vm.swap_total", &swap_total, &sizeof_u_long, nullptr, 0);
     mem_info.total_physical_memory = physmem;
     mem_info.total_swap_memory = swap_total;
+#elif defined(__SWITCH__)
+    // the memory pool given to this process (InfoType_TotalMemorySize, CUR_PROCESS_HANDLE)
+    u64 total{};
+    if (svcGetInfo(&total, 6, 0xFFFF8001, 0) == 0) {
+        mem_info.total_physical_memory = total;
+    }
+    mem_info.total_swap_memory = 0;
 #elif defined(__linux__)
     struct sysinfo meminfo;
     sysinfo(&meminfo);

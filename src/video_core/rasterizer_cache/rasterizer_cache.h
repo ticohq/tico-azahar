@@ -1023,7 +1023,8 @@ void RasterizerCache<T>::ValidateSurface(SurfaceId surface_id, PAddr addr, u32 s
         }
 
         FlushRegion(params.addr, params.size);
-        if (!use_custom_textures || !UploadCustomSurface(surface_id, interval)) {
+        const bool try_custom = use_custom_textures && custom_tex_manager.HasMaterials();
+        if (!try_custom || !UploadCustomSurface(surface_id, interval)) {
             UploadSurface(surface, interval);
         }
         notify_validated(params.GetInterval());
@@ -1111,6 +1112,12 @@ bool RasterizerCache<T>::UploadCustomSurface(SurfaceId surface_id, SurfaceInterv
     }
     if (level != 0 && custom_tex_manager.SkipMipmaps()) {
         return true;
+    }
+
+    // Once the decoded custom-texture set reaches the memory budget, stop pulling in
+    // new textures so a large pack can't exhaust the heap.
+    if (material->IsUnloaded() && custom_tex_manager.IsOverMemoryBudget()) {
+        return false;
     }
 
     surface.flags |= SurfaceFlagBits::Custom;

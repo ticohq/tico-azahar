@@ -27,6 +27,9 @@ MICROPROFILE_DEFINE(CustomTexManager_TickFrame, "CustomTexManager", "TickFrame",
 
 constexpr std::size_t MAX_UPLOADS_PER_TICK = 8;
 
+// A resident custom texture costs roughly its decoded size twice.
+constexpr u64 CUSTOM_TEX_MEM_FACTOR = 2;
+
 using namespace Common::Literals;
 
 bool IsPow2(u32 value) {
@@ -92,6 +95,7 @@ void CustomTexManager::FindCustomTextures() {
     if (!workers) {
         CreateWorkers();
     }
+    ComputeMemoryBudget();
 
     const u64 title_id = system.Kernel().GetCurrentProcess()->codeset->program_id;
     const auto textures = GetTextures(title_id);
@@ -119,7 +123,11 @@ void CustomTexManager::FindCustomTextures() {
             material->AddMapTexture(texture);
         }
     }
+    has_materials = !material_map.empty();
     textures_loaded = true;
+    if (!has_materials) {
+        LOG_INFO(Render, "No custom textures found for title {:016X}", title_id);
+    }
 }
 
 bool CustomTexManager::ParseFilename(const FileUtil::FSTEntry& file, CustomTexture* texture) {
@@ -298,12 +306,21 @@ Material* CustomTexManager::GetMaterial(u64 data_hash) {
 
 bool CustomTexManager::Decode(Material* material, std::function<bool()>&& upload) {
     if (!async_custom_loading) {
+        const bool was_unloaded = material->IsUnloaded();
         material->LoadFromDisk(flip_png_files);
+        if (was_unloaded) {
+            custom_tex_mem_usage.fetch_add(material->size * CUSTOM_TEX_MEM_FACTOR,
+                                           std::memory_order_relaxed);
+        }
         return upload();
     }
     if (material->IsUnloaded()) {
         material->state = DecodeState::Pending;
-        workers->QueueWork([material, this] { material->LoadFromDisk(flip_png_files); });
+        workers->QueueWork([material, this] {
+            material->LoadFromDisk(flip_png_files);
+            custom_tex_mem_usage.fetch_add(material->size * CUSTOM_TEX_MEM_FACTOR,
+                                           std::memory_order_relaxed);
+        });
     }
     async_uploads.push_back({
         .material = material,
@@ -388,6 +405,15 @@ std::vector<FileUtil::FSTEntry> CustomTexManager::GetTextures(u64 title_id) {
 void CustomTexManager::CreateWorkers() {
     const std::size_t num_workers = std::max(std::thread::hardware_concurrency(), 2U) >> 1;
     workers = std::make_unique<Common::ThreadWorker>(num_workers, "Custom textures");
+}
+
+void CustomTexManager::ComputeMemoryBudget() {
+    // Reserve headroom for the emulator core, GPU driver and guest RAM.
+    const u64 sys_mem = Common::GetMemInfo().total_physical_memory;
+    const u64 recommended_min_mem = 2_GiB;
+    max_custom_tex_mem = (sys_mem / 2 < recommended_min_mem) ? (sys_mem / 2)
+                                                             : (sys_mem - recommended_min_mem);
+    LOG_INFO(Render, "Custom texture memory budget: {} MiB", max_custom_tex_mem / 1_MiB);
 }
 
 } // namespace VideoCore
