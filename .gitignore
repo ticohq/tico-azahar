@@ -64,3 +64,5 @@ GIT-TAG
 
 # verify-release.sh downloads
 verify/
+# TicoSecure build secret (shared with tico)
+/tico/TicoSecret.h

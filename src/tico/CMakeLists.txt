@@ -20,6 +20,8 @@ add_executable(tico
     movie_throttle.h
     overlay_renderer.cpp
     saves.cpp
+    session_bridge.cpp
+    session_bridge.h
     saves.h
     switch_keyboard.cpp
     switch_keyboard.h
@@ -115,6 +117,8 @@ target_link_libraries(tico PRIVATE
     # by path so portlibs' FAT-only copy is not picked up instead, and before libnx
     ${TICO_SHARED_DIR}/deps/usbhsfs/lib/libusbhsfs.a
     ${TICO_SHARED_DIR}/deps/usbhsfs/lib/libusbntfs.a
+    # libsodium: TicoSecure opens the session tico seals for each launch
+    $ENV{DEVKITPRO}/portlibs/switch/lib/libsodium.a
     z
     nx
     m

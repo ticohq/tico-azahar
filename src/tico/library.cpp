@@ -6,6 +6,9 @@
 // Library), as tico-dolphin's library does.
 
 #include "tico/library.h"
+#include "tico/session_bridge.h"
+
+#include <sstream>
 
 #include <algorithm>
 #include <array>
@@ -58,7 +61,8 @@ std::string WithSlash(std::string path) {
 // tico's ROM bases (general.jsonc): the ROMs path, then the extra bases.
 std::vector<std::string> TicoRomBases() {
     std::vector<std::string> bases;
-    std::ifstream file("sdmc:/tico/config/general.jsonc");
+    // tico's settings, from its sealed session
+    std::istringstream file(TicoBridge::SettingsText("general"));
     const nlohmann::json j =
         file.good() ? nlohmann::json::parse(file, nullptr, false, true) : nlohmann::json();
     const std::string roms = j.is_object() ? j.value("roms_path", std::string()) : std::string();

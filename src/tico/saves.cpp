@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "tico/saves.h"
+#include "tico/session_bridge.h"
 
 #include <atomic>
 #include <cstdio>
@@ -50,9 +51,8 @@ std::string ContentDir(const char* key, const char* default_root) {
     if (root.empty()) {
         root = default_root;
     }
-    if (root.back() != '/') {
-        root += '/';
-    }
+    // A folder inside tico's becomes the current user's (TicoSession.h)
+    root = TicoBridge::UserContentRoot(root, std::string(key) == "tico_saves_path");
     return root + "3ds/";
 }
 
@@ -103,7 +103,10 @@ void UseFolder(FileUtil::UserPath path, const std::string& dir) {
         LOG_ERROR(Frontend, "saves: could not make {}, keeping {}", dir, old_dir);
         return;
     }
-    if (old_dir != dir && FileUtil::IsDirectory(old_dir) && !MoveEntries(old_dir, dir)) {
+    // The old folders in tico/system/3ds are the account's tico moved
+    // everything to: anyone else just uses their own folder.
+    if (old_dir != dir && FileUtil::IsDirectory(old_dir) && TicoBridge::InheritsShared() &&
+        !MoveEntries(old_dir, dir)) {
         LOG_ERROR(Frontend, "saves: {} could not move entirely, keeping it", old_dir);
         return;
     }
