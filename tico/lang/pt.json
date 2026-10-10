@@ -236,5 +236,6 @@
     "settings_azahar_value_vertical": "Vertical",
     "settings_azahar_value_vertical_inverted": "Vertical invertida",
     "settings_azahar_volume": "Volume",
-    "settings_azahar_vsync": "VSync"
+    "settings_azahar_vsync": "VSync",
+    "settings_azahar_load_boost": "Boost ao carregar (início do jogo, estados)"
 }

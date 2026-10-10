@@ -233,5 +233,6 @@
     "settings_azahar_value_vertical": "Vertikal",
     "settings_azahar_value_vertical_inverted": "Vertikal, gedreht",
     "settings_azahar_volume": "Lautstärke",
-    "settings_azahar_vsync": "VSync"
+    "settings_azahar_vsync": "VSync",
+    "settings_azahar_load_boost": "Boost beim Laden (Spielstart, Spielstände)"
 }

@@ -4,6 +4,8 @@
 
 #include "tico/clocks.h"
 
+#include <atomic>
+
 #include "common/logging/log.h"
 #include "tico/switch_libnx.h"
 
@@ -14,6 +16,11 @@ constexpr u32 kCpuClockHz = 1785000000;
 constexpr u32 kGpuClockHz = 768000000;
 
 bool s_boosted = false;
+// Boost mode raises a clock, never lowers it: each is boosted only when it
+// runs at or below the target. One already faster (an overclock, a clock
+// manager's profile) is left as it is.
+bool s_boost_cpu = false;
+bool s_boost_gpu = false;
 bool s_service_initialized = false;
 bool s_uses_clkrst = false;
 bool s_restore_cpu = false;
@@ -131,8 +138,9 @@ bool OverrideWithClockManager() {
             continue;
         }
         s_clock_manager_open = true;
-        // modules: 0 CPU, 1 GPU
-        if (SetOverride(0, kCpuClockHz) && SetOverride(1, kGpuClockHz)) {
+        // modules: 0 CPU, 1 GPU; only the ones being boosted
+        if ((!s_boost_cpu || SetOverride(0, kCpuClockHz)) &&
+            (!s_boost_gpu || SetOverride(1, kGpuClockHz))) {
             LOG_INFO(Frontend, "clocks: boosted through {}", name);
             return true;
         }
@@ -146,14 +154,28 @@ bool OverrideWithClockManager() {
 } // namespace
 
 void Boost() {
+    // A clock that can't be read is boosted, as before
+    u32 cpu_now = 0;
+    u32 gpu_now = 0;
+    s_boost_cpu = !GetRate(true, &cpu_now) || cpu_now <= kCpuClockHz;
+    s_boost_gpu = !GetRate(false, &gpu_now) || gpu_now <= kGpuClockHz;
+    if (!s_boost_cpu) {
+        LOG_INFO(Frontend, "clocks: the CPU already runs faster ({} Hz), left as it is", cpu_now);
+    }
+    if (!s_boost_gpu) {
+        LOG_INFO(Frontend, "clocks: the GPU already runs faster ({} Hz), left as it is", gpu_now);
+    }
+    if (!s_boost_cpu && !s_boost_gpu) {
+        return;
+    }
     s_boosted = true;
     if (OverrideWithClockManager()) {
         return;
     }
-    s_restore_cpu = GetRate(true, &s_original_cpu_hz);
-    s_restore_gpu = GetRate(false, &s_original_gpu_hz);
-    const bool cpu = SetRate(true, kCpuClockHz);
-    const bool gpu = SetRate(false, kGpuClockHz);
+    s_restore_cpu = s_boost_cpu && GetRate(true, &s_original_cpu_hz);
+    s_restore_gpu = s_boost_gpu && GetRate(false, &s_original_gpu_hz);
+    const bool cpu = s_boost_cpu && SetRate(true, kCpuClockHz);
+    const bool gpu = s_boost_gpu && SetRate(false, kGpuClockHz);
     LOG_INFO(Frontend, "clocks: boosted (cpu {} gpu {}, were {} and {} Hz)", cpu, gpu,
              s_original_cpu_hz, s_original_gpu_hz);
 }
@@ -184,8 +206,12 @@ void Keep() {
         if (resumed || mode_changed) {
             SetOverride(0, 0);
             SetOverride(1, 0);
-            SetOverride(0, kCpuClockHz);
-            SetOverride(1, kGpuClockHz);
+            if (s_boost_cpu) {
+                SetOverride(0, kCpuClockHz);
+            }
+            if (s_boost_gpu) {
+                SetOverride(1, kGpuClockHz);
+            }
         }
         return;
     }
@@ -200,17 +226,63 @@ void Keep() {
 
     u32 cpu_hz = 0;
     u32 gpu_hz = 0;
-    const bool cpu_reset = GetRate(true, &cpu_hz) && cpu_hz != kCpuClockHz;
-    const bool gpu_reset = GetRate(false, &gpu_hz) && gpu_hz != kGpuClockHz;
+    // Only what Boost mode raised, only when it fell below: a clock something
+    // else raised higher stays
+    const bool cpu_reset = s_boost_cpu && GetRate(true, &cpu_hz) && cpu_hz < kCpuClockHz;
+    const bool gpu_reset = s_boost_gpu && GetRate(false, &gpu_hz) && gpu_hz < kGpuClockHz;
     if (cpu_reset || gpu_reset) {
         LOG_INFO(Frontend, "clocks: were reset (cpu {} gpu {} Hz), setting them again", cpu_hz,
                  gpu_hz);
-        SetRate(true, kCpuClockHz);
-        SetRate(false, kGpuClockHz);
+        if (cpu_reset) {
+            SetRate(true, kCpuClockHz);
+        }
+        if (gpu_reset) {
+            SetRate(false, kGpuClockHz);
+        }
+    }
+}
+
+namespace {
+std::atomic<bool> s_load_boost_allowed{false};
+std::atomic<int> s_load_boost_holds{0};
+} // namespace
+
+void AllowLoadBoost(bool allowed) {
+    s_load_boost_allowed = allowed;
+}
+
+bool HoldLoadBoost(const char* why) {
+    if (!s_load_boost_allowed.load(std::memory_order_acquire)) {
+        return false;
+    }
+    u32 cpu_hz = 0;
+    if (s_load_boost_holds.load(std::memory_order_acquire) == 0 && GetRate(true, &cpu_hz) &&
+        cpu_hz >= kCpuClockHz) {
+        LOG_INFO(Frontend, "clocks: load boost skipped ({}), the CPU already runs at {} Hz", why,
+                 cpu_hz);
+        return false;
+    }
+    if (s_load_boost_holds.fetch_add(1, std::memory_order_acq_rel) == 0) {
+        if (appletSetCpuBoostMode(ApmCpuBoostMode_FastLoad) != 0) {
+            s_load_boost_holds.fetch_sub(1, std::memory_order_acq_rel);
+            return false;
+        }
+        LOG_INFO(Frontend, "clocks: load boost on ({})", why);
+    }
+    return true;
+}
+
+void ReleaseLoadBoost() {
+    if (s_load_boost_holds.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        appletSetCpuBoostMode(ApmCpuBoostMode_Normal);
+        LOG_INFO(Frontend, "clocks: load boost off");
     }
 }
 
 void Restore() {
+    if (s_load_boost_holds.exchange(0, std::memory_order_acq_rel) > 0) {
+        appletSetCpuBoostMode(ApmCpuBoostMode_Normal);
+    }
     if (!s_boosted) {
         return;
     }

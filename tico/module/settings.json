@@ -202,6 +202,13 @@
               "key": "azahar_boost_mode",
               "label": "settings_azahar_boost_mode",
               "type": "bool",
+              "default": "false",
+              "restart": true
+            },
+            {
+              "key": "azahar_load_boost",
+              "label": "settings_azahar_load_boost",
+              "type": "bool",
               "default": "true",
               "restart": true
             },
