@@ -40,6 +40,7 @@
 #include "tico/library_screen.h"
 #include "tico/movie_throttle.h"
 #include "tico/saves.h"
+#include "tico/session_bridge.h"
 #include "tico/switch_keyboard.h"
 #include "tico/tico_settings.h"
 #include "common/file_util.h"
@@ -1561,6 +1562,9 @@ int Run(int argc, char** argv) {
             vulkan_renderer->RedrawCurrentFrame();
         } else {
             run_result = system.RunLoop();
+            if (saw_guest_frame) {
+                TicoBridge::PlaytimeFrame(); // the game ran: to the player's playtime
+            }
         }
         loop_count++;
         const s32 renderer_frame =
@@ -1616,6 +1620,7 @@ int Run(int argc, char** argv) {
         }
     }
 
+    TicoBridge::PlaytimeFlush(); // the game's last seconds
     DebugLog("shutting down: reason=%s powered=%d applet=%d iterations=%llu", exit_reason,
              system.IsPoweredOn() ? 1 : 0, applet_loop_active ? 1 : 0,
              static_cast<unsigned long long>(loop_count));

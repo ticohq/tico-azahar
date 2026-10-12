@@ -16,5 +16,8 @@ std::string UserContentRoot(const std::string& folder, bool saves);
 bool InheritsShared();
 /// tico::SettingsText: tico's "general", "display" or "audio" settings.
 std::string SettingsText(const char* name);
+/// tico::PlaytimeFrame / PlaytimeFlush: the player's playtime.
+void PlaytimeFrame();
+void PlaytimeFlush();
 
 } // namespace TicoBridge

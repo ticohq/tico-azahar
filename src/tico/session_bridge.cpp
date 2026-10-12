@@ -18,4 +18,12 @@ std::string SettingsText(const char* name) {
     return tico::SettingsText(name);
 }
 
+void PlaytimeFrame() {
+    tico::PlaytimeFrame();
+}
+
+void PlaytimeFlush() {
+    tico::PlaytimeFlush();
+}
+
 } // namespace TicoBridge
