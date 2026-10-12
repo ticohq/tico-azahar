@@ -234,5 +234,8 @@
     "settings_azahar_value_vertical_inverted": "Вертикальная, перевёрнутая",
     "settings_azahar_volume": "Громкость",
     "settings_azahar_vsync": "Вертикальная синхронизация",
-    "settings_azahar_load_boost": "Ускорение при загрузке (запуск игры, сохранения)"
+    "settings_azahar_load_boost": "Ускорение при загрузке (запуск игры, сохранения)",
+    "settings_azahar_section_hud": "Экранная информация",
+    "settings_azahar_fps_counter": "Счётчик FPS",
+    "settings_azahar_rendered_resolution": "Разрешение рендеринга"
 }

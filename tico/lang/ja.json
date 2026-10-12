@@ -237,5 +237,8 @@
     "settings_azahar_value_vertical_inverted": "縦（反転）",
     "settings_azahar_volume": "音量",
     "settings_azahar_vsync": "垂直同期",
-    "settings_azahar_load_boost": "読み込み時のブースト（ゲーム起動、ステート）"
+    "settings_azahar_load_boost": "読み込み時のブースト（ゲーム起動、ステート）",
+    "settings_azahar_section_hud": "画面表示",
+    "settings_azahar_fps_counter": "FPSカウンター",
+    "settings_azahar_rendered_resolution": "描画解像度"
 }

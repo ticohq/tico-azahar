@@ -237,5 +237,8 @@
     "settings_azahar_value_vertical_inverted": "Vertical invertida",
     "settings_azahar_volume": "Volume",
     "settings_azahar_vsync": "VSync",
-    "settings_azahar_load_boost": "Boost ao carregar (início do jogo, estados)"
+    "settings_azahar_load_boost": "Boost ao carregar (início do jogo, estados)",
+    "settings_azahar_section_hud": "Informações na tela",
+    "settings_azahar_fps_counter": "Contador de FPS",
+    "settings_azahar_rendered_resolution": "Resolução renderizada"
 }

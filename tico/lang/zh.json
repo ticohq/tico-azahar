@@ -237,5 +237,8 @@
     "settings_azahar_value_vertical_inverted": "纵向（反转）",
     "settings_azahar_volume": "音量",
     "settings_azahar_vsync": "垂直同步",
-    "settings_azahar_load_boost": "加载时加速（游戏启动、即时存档）"
+    "settings_azahar_load_boost": "加载时加速（游戏启动、即时存档）",
+    "settings_azahar_section_hud": "屏幕信息",
+    "settings_azahar_fps_counter": "帧率计数器",
+    "settings_azahar_rendered_resolution": "渲染分辨率"
 }
