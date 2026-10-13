@@ -63,7 +63,7 @@ NACP_FILE="${BUILD_DIR}/azahar-switch.nacp"
 NRO_FILE="${SCRIPT_DIR}/azahar-switch.nro"
 TICO_NRO_FILE="${SCRIPT_DIR}/tico-azahar.nro"
 ROMFS_DIR="${BUILD_DIR}/tico_romfs"
-nacptool --create "tico Azahar" "ticoverse.com" "1.0.6" "${NACP_FILE}"
+nacptool --create "tico-azahar" "Azahar Team/ticoverse.com" "3.0.0" "${NACP_FILE}"
 rm -rf "${ROMFS_DIR}"
 mkdir -p "${ROMFS_DIR}"
 # the overlay's fonts, strings and pictures, and the settings definition it
@@ -75,7 +75,7 @@ mkdir -p "${ROMFS_DIR}/module"
 cp "${SCRIPT_DIR}/tico/module/settings.json" "${ROMFS_DIR}/module/"
 cp "${ELF_FILE}" "${BUILD_DIR}/azahar-switch.debug.elf"
 "${DEVKITPRO}/devkitA64/bin/aarch64-none-elf-strip" --strip-all "${ELF_FILE}"
-elf2nro "${ELF_FILE}" "${NRO_FILE}" --nacp="${NACP_FILE}" --romfsdir="${ROMFS_DIR}"
+elf2nro "${ELF_FILE}" "${NRO_FILE}" --nacp="${NACP_FILE}" --icon="${SCRIPT_DIR}/tico/icon.jpg" --romfsdir="${ROMFS_DIR}"
 cp "${NRO_FILE}" "${TICO_NRO_FILE}"
 
 if [ -n "${SWITCH_SD_ROOT:-}" ]; then
