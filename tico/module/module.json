@@ -26,7 +26,7 @@
         ".zcxi",
         ".app"
       ],
-      "games_file": "3ds.json",
+      "games_file": "3ds.dat",
       "colors": {
         "start": "5FAFE6",
         "end": "4A7DE0",
