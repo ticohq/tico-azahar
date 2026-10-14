@@ -12,7 +12,7 @@ namespace TicoBridge {
 
 /// tico::UserContentRoot: the current user's saves or states folder.
 std::string UserContentRoot(const std::string& folder, bool saves);
-/// tico::Session::inheritsShared: old data in tico/system/3ds is this user's.
+/// tico::Session::inheritsShared: old data in tico/system/azahar is this user's.
 bool InheritsShared();
 /// tico::SettingsText: tico's "general", "display" or "audio" settings.
 std::string SettingsText(const char* name);

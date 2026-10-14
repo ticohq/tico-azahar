@@ -81,14 +81,14 @@ extern size_t __tls_align;
 
 namespace {
 
-constexpr const char* SystemDir = "sdmc:/tico/system/3ds";
-constexpr const char* DebugDir = "sdmc:/tico/system/3ds/debug";
-constexpr const char* BootMarkerPath = "sdmc:/tico/system/3ds/azahar_boot.txt";
-constexpr const char* StartupLogPath = "sdmc:/tico/system/3ds/debug/startup.txt";
-constexpr const char* DebugLogPath = "sdmc:/tico/system/3ds/debug/azahar_switch.txt";
-constexpr const char* StdoutLogPath = "sdmc:/tico/system/3ds/debug/stdout.txt";
-constexpr const char* StderrLogPath = "sdmc:/tico/system/3ds/debug/stderr.txt";
-constexpr const char* MemMapLogPath = "sdmc:/tico/system/3ds/debug/memmap.txt";
+constexpr const char* SystemDir = "sdmc:/tico/system/azahar";
+constexpr const char* DebugDir = "sdmc:/tico/system/azahar/debug";
+constexpr const char* BootMarkerPath = "sdmc:/tico/system/azahar/azahar_boot.txt";
+constexpr const char* StartupLogPath = "sdmc:/tico/system/azahar/debug/startup.txt";
+constexpr const char* DebugLogPath = "sdmc:/tico/system/azahar/debug/azahar_switch.txt";
+constexpr const char* StdoutLogPath = "sdmc:/tico/system/azahar/debug/stdout.txt";
+constexpr const char* StderrLogPath = "sdmc:/tico/system/azahar/debug/stderr.txt";
+constexpr const char* MemMapLogPath = "sdmc:/tico/system/azahar/debug/memmap.txt";
 constexpr const char* TicoLauncherPath = "sdmc:/switch/tico/tico.nro";
 // Temporary debug file gates. Flip these back on when collecting detailed boot logs.
 constexpr bool EnableStartupLogFile = false;
@@ -105,6 +105,11 @@ PadState pad{};
 void EnsureSystemDirs() {
     mkdir("sdmc:/tico", 0777);
     mkdir("sdmc:/tico/system", 0777);
+    // The emulator's own folder; before 3.0.1 it was tico/system/3ds. tico
+    // moves it too, but Azahar may start without tico.
+    struct stat st;
+    if (stat(SystemDir, &st) != 0 && stat("sdmc:/tico/system/3ds", &st) == 0)
+        rename("sdmc:/tico/system/3ds", SystemDir);
     mkdir(SystemDir, 0777);
 }
 

@@ -34,7 +34,7 @@ namespace {
 constexpr std::uint32_t ESR_EC_DATA_ABORT_LOWER = 0x24;
 constexpr std::uint32_t ESR_EC_DATA_ABORT_SAME = 0x25;
 
-constexpr const char* CRASH_PATH = "/tico/system/3ds/debug/crash.txt";
+constexpr const char* CRASH_PATH = "/tico/system/azahar/debug/crash.txt";
 
 char s_report[8192];
 std::size_t s_report_len;
@@ -115,8 +115,8 @@ void WriteReportToSd() {
 
     fsFsCreateDirectory(sdmc, "/tico");
     fsFsCreateDirectory(sdmc, "/tico/system");
-    fsFsCreateDirectory(sdmc, "/tico/system/3ds");
-    fsFsCreateDirectory(sdmc, "/tico/system/3ds/debug");
+    fsFsCreateDirectory(sdmc, "/tico/system/azahar");
+    fsFsCreateDirectory(sdmc, "/tico/system/azahar/debug");
     fsFsDeleteFile(sdmc, CRASH_PATH);
     if (R_FAILED(fsFsCreateFile(sdmc, CRASH_PATH, static_cast<s64>(s_report_len), 0))) {
         return;

@@ -5,6 +5,7 @@
   "launch": "\"{nro}\" \"{rom}\" \"{title}\"",
   "settings": "config/modules/azahar/settings.json",
   "config_file": "azahar.jsonc",
+  "system_dir": "azahar",
   "is_libretro": false,
   "bool_true_value": "true",
   "bool_false_value": "false",

@@ -49,7 +49,7 @@ uid_t getuid(void) {
 
 struct passwd* getpwuid(uid_t) {
     static char name[] = "switch";
-    static char home[] = "sdmc:/tico/system/3ds";
+    static char home[] = "sdmc:/tico/system/azahar";
     static char shell[] = "";
     static struct passwd entry{};
 

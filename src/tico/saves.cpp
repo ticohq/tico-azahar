@@ -103,7 +103,7 @@ void UseFolder(FileUtil::UserPath path, const std::string& dir) {
         LOG_ERROR(Frontend, "saves: could not make {}, keeping {}", dir, old_dir);
         return;
     }
-    // The old folders in tico/system/3ds are the account's tico moved
+    // The old folders in tico/system/azahar are the account's tico moved
     // everything to: anyone else just uses their own folder.
     if (old_dir != dir && FileUtil::IsDirectory(old_dir) && TicoBridge::InheritsShared() &&
         !MoveEntries(old_dir, dir)) {

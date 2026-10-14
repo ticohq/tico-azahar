@@ -17,7 +17,7 @@ class System;
 // The emulated SD card, where 3DS games keep their saves and extra data, is
 // sdmc:/tico/saves/3ds, and the save states are in sdmc:/tico/states/3ds (or
 // under the roots set in tico). LayeredFS mods are in sdmc:/tico/mods/3ds,
-// a folder per title ID. The console's NAND stays in tico/system/3ds.
+// a folder per title ID. The console's NAND stays in tico/system/azahar.
 namespace SwitchFrontend::Saves {
 
 // Points Azahar at tico's folders, moving the SD card, states and mods from where
