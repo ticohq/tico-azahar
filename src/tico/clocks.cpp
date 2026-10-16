@@ -251,29 +251,37 @@ void AllowLoadBoost(bool allowed) {
     s_load_boost_allowed = allowed;
 }
 
-bool HoldLoadBoost(const char* why) {
+LoadBoostScope::LoadBoostScope(const char* why) {
     if (!s_load_boost_allowed.load(std::memory_order_acquire)) {
-        return false;
+        return;
     }
     u32 cpu_hz = 0;
     if (s_load_boost_holds.load(std::memory_order_acquire) == 0 && GetRate(true, &cpu_hz) &&
         cpu_hz >= kCpuClockHz) {
         LOG_INFO(Frontend, "clocks: load boost skipped ({}), the CPU already runs at {} Hz", why,
                  cpu_hz);
-        return false;
+        return;
     }
     if (s_load_boost_holds.fetch_add(1, std::memory_order_acq_rel) == 0) {
         if (appletSetCpuBoostMode(ApmCpuBoostMode_FastLoad) != 0) {
             s_load_boost_holds.fetch_sub(1, std::memory_order_acq_rel);
-            return false;
+            return;
         }
         LOG_INFO(Frontend, "clocks: load boost on ({})", why);
     }
-    return true;
+    held_ = true;
 }
 
-void ReleaseLoadBoost() {
-    if (s_load_boost_holds.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+LoadBoostScope::~LoadBoostScope() {
+    // Restore may have ended it already (exit during a load)
+    if (!held_) {
+        return;
+    }
+    int holds = s_load_boost_holds.load(std::memory_order_acquire);
+    while (holds > 0 &&
+           !s_load_boost_holds.compare_exchange_weak(holds, holds - 1, std::memory_order_acq_rel)) {
+    }
+    if (holds == 1) {
         appletSetCpuBoostMode(ApmCpuBoostMode_Normal);
         LOG_INFO(Frontend, "clocks: load boost off");
     }

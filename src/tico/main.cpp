@@ -922,16 +922,6 @@ bool SaveStateFromOverlay(Core::System& system, int slot) {
     }
 
     DebugLog("overlay save state slot %d", slot);
-    // the game waits for the save, so the boost's minimum GPU costs nothing
-    const bool boosted = SwitchFrontend::Clocks::HoldLoadBoost("saving a state");
-    struct BoostRelease {
-        bool held;
-        ~BoostRelease() {
-            if (held) {
-                SwitchFrontend::Clocks::ReleaseLoadBoost();
-            }
-        }
-    } boost_release{boosted};
     try {
         SwitchFrontend::Saves::SaveSlot(system, game_title_id, slot);
         if (slot != SwitchFrontend::OverlayUI::kAutoStateSlot) {
@@ -956,15 +946,6 @@ bool LoadStateFromOverlay(Core::System& system, StateLoad load, int slot) {
     }
 
     DebugLog("overlay load state %d slot %d", static_cast<int>(load), slot);
-    const bool boosted = SwitchFrontend::Clocks::HoldLoadBoost("loading a state");
-    struct BoostRelease {
-        bool held;
-        ~BoostRelease() {
-            if (held) {
-                SwitchFrontend::Clocks::ReleaseLoadBoost();
-            }
-        }
-    } boost_release{boosted};
     try {
         switch (load) {
         case StateLoad::Slot:
@@ -1188,6 +1169,9 @@ void ConfigureOverlay(Core::System& system, const std::string& display_title) {
 bool OfferAutoSave(Core::System& system) {
     namespace OverlayUI = SwitchFrontend::OverlayUI;
     const bool restarted = std::remove(RestartMarkerPath().c_str()) == 0;
+    // tico's General > Quick Menu Tip: shown once the game runs smoothly
+    if (!restarted)
+        OverlayUI::ShowQuickMenuTip();
     if (restarted || game_title_id == 0 ||
         !FileExists(SwitchFrontend::Saves::StatePath(game_title_id, OverlayUI::kAutoStateSlot))) {
         return false;
@@ -1371,16 +1355,13 @@ int Run(int argc, char** argv) {
     SwitchFrontend::TicoSettings::MigrateOldKeys();
     SwitchFrontend::TicoConfig::SetGame(rom_path);
     SwitchFrontend::TicoSettings::Apply();
-    bool startup_boost = false; // held until the game's first frame
     // Boost mode (off unless chosen) for the whole game; without it, Boost
-    // while loading (on unless turned off) speeds up the start and every state
-    // saved or loaded
+    // while loading (on unless turned off) speeds up loading the game
     if (SwitchFrontend::TicoConfig::GetConfigValue("azahar_boost_mode", "false") == "true") {
         SwitchFrontend::Clocks::Boost();
     } else {
         SwitchFrontend::Clocks::AllowLoadBoost(
             SwitchFrontend::TicoConfig::GetConfigValue("azahar_load_boost", "true") == "true");
-        startup_boost = SwitchFrontend::Clocks::HoldLoadBoost("starting the game");
     }
     DebugLog("tico config applied: path=%s options=%zu game_settings=%d res=%u",
              SwitchFrontend::TicoConfig::GetLoadedConfigPath().c_str(),
@@ -1412,7 +1393,12 @@ int Run(int argc, char** argv) {
     StartupLog("Run: creating NWindow frontend");
     SwitchFrontend::EmuWindowSwitch window{nwindowGetDefault()};
     DebugLog("loading ROM: %s", rom_path.c_str());
-    const Core::System::ResultStatus load_result = system.Load(window, rom_path);
+    Core::System::ResultStatus load_result;
+    {
+        // Boost while loading: only while the game loads, as dekopon does
+        const SwitchFrontend::Clocks::LoadBoostScope boost("loading the game");
+        load_result = system.Load(window, rom_path);
+    }
     if (load_result != Core::System::ResultStatus::Success) {
         DebugLog("load failed: %s (%u)", ResultStatusName(load_result),
                  static_cast<unsigned>(load_result));
@@ -1505,10 +1491,6 @@ int Run(int argc, char** argv) {
         InputCommon::SwitchHID::Update();
         padUpdate(&pad);
 
-        if (startup_boost && renderer.GetCurrentFrame() > 0) {
-            startup_boost = false; // the game is up
-            SwitchFrontend::Clocks::ReleaseLoadBoost();
-        }
         if (vulkan_renderer && !overlay_init_attempted && renderer.GetCurrentFrame() > 0) {
             overlay_init_attempted = true;
             overlay_initialized = SwitchFrontend::GameOverlay::Init(*vulkan_renderer);

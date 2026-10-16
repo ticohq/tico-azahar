@@ -237,8 +237,9 @@
     "settings_azahar_value_vertical_inverted": "Vertical invertida",
     "settings_azahar_volume": "Volumen",
     "settings_azahar_vsync": "VSync",
-    "settings_azahar_load_boost": "Boost al cargar (inicio del juego, estados)",
+    "settings_azahar_load_boost": "Boost al cargar el juego",
     "settings_azahar_section_hud": "Información en pantalla",
     "settings_azahar_fps_counter": "Contador de FPS",
-    "settings_azahar_rendered_resolution": "Resolución renderizada"
+    "settings_azahar_rendered_resolution": "Resolución renderizada",
+    "emulator_quick_menu_tip": "Pulsa {plus} y {minus} a la vez para abrir el menú rápido"
 }

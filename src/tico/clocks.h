@@ -21,15 +21,25 @@ void Keep();
 
 void Restore();
 
-// Boost while loading (on unless turned off), as dolphin-nx does: the
-// system's CPU boost (FastLoad: the CPU at 1785 MHz, the GPU at its minimum)
-// while a game starts, until its first frame, and while a state is saved or
-// loaded, with the game waiting. Not with Boost mode on (AllowLoadBoost
-// false), nor when the CPU already runs at 1785 MHz or faster. Holds count;
-// each true from HoldLoadBoost is paired with a ReleaseLoadBoost. Restore
-// ends it too.
+// Boost while loading (on unless turned off), as dekopon does: the system's
+// CPU boost profile (ApmCpuBoostMode_FastLoad: the CPU at 1785 MHz, the GPU at
+// its minimum) for as long as a LoadBoostScope lives, which is while the game
+// loads (System::Load). Never while the game runs, so states are saved and
+// loaded at the game's own clocks. Not with Boost mode on (AllowLoadBoost
+// false), nor when the CPU already runs at 1785 MHz or faster. Scopes nest;
+// Restore ends it too.
 void AllowLoadBoost(bool allowed);
-bool HoldLoadBoost(const char* why);
-void ReleaseLoadBoost();
+
+class LoadBoostScope {
+public:
+    explicit LoadBoostScope(const char* why);
+    ~LoadBoostScope();
+
+    LoadBoostScope(const LoadBoostScope&) = delete;
+    LoadBoostScope& operator=(const LoadBoostScope&) = delete;
+
+private:
+    bool held_ = false;
+};
 
 } // namespace SwitchFrontend::Clocks
