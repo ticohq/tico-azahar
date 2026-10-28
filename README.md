@@ -6,6 +6,9 @@
 
 *Part of the Tico ecosystem* - https://www.ticoverse.com
 
+> [!WARNING]
+> **This core is deprecated and no longer maintained.** tico's 3DS core is now [tico-dekopon](https://github.com/danfromtico/tico-dekopon). Install Dekopon from the tico Store instead. This repository stays available, read-only, for reference.
+
 **Azahar** is an open-source emulator for the Nintendo 3DS, based on Citra and built from the merging of PabloMK7's Citra fork and Lime3DS.
 
 This fork adapts Azahar to work with the Tico frontend and provides a standalone build for the Nintendo Switch, adding a small set of practical features while preserving the compatibility and design direction of the original project.
